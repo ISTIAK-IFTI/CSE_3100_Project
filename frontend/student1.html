@@ -1,0 +1,658 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Student Dashboard</title>
+
+  <style>
+    :root{
+      --bg:#f3f4f6;
+      --card:#ffffff;
+      --text:#111827;
+      --muted:#6b7280;
+      --line:#e5e7eb;
+      --btn:#111827;
+      --btnText:#ffffff;
+      --danger:#b00020;
+      --ok:#0b7a2a;
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family: Arial, sans-serif;
+      background: var(--bg);
+      /* background-color: #b6d9d0; */
+      background-color: #F5E7DE;
+      color: var(--text);
+    }
+
+    .page{
+      max-width: 920px;
+      margin: 26px auto;
+      padding: 0 16px 40px;
+    }
+
+    .header{
+      display:flex;
+      align-items:flex-end;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom: 14px;
+    }
+    .header h1{
+      margin:0;
+      font-size: 24px;
+      border-bottom: 2px solid var(--line);
+      padding-bottom: 8px;
+    }
+    .header .actions{
+      display:flex;
+      gap:10px;
+      align-items:center;
+    }
+    .btn{
+      border:none;
+      padding: 10px 12px;
+      border-radius: 10px;
+      cursor:pointer;
+      background: var(--btn);
+      color: var(--btnText);
+      font-size: 14px;
+    }
+    .btn.secondary{
+      background:#374151;
+    }
+    .btn.danger{
+      background:#7f1d1d;
+    }
+
+    .card{
+      background: var(--card);
+      background-color: #f3dbce;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 10px 24px rgba(0,0,0,.06);
+    }
+
+    .top{
+      display:grid;
+      grid-template-columns: 1.4fr .6fr;
+      gap: 16px;
+      align-items:start;
+      margin-bottom: 16px;
+    }
+
+    .infoGrid{
+      display:grid;
+      grid-template-columns: 110px 1fr;
+      row-gap: 10px;
+      column-gap: 12px;
+      padding: 6px 0;
+    }
+    .label{
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .value{
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .photoBox{
+      border: 1px dashed var(--line);
+      border-radius: 12px;
+      padding: 10px;
+      text-align:center;
+    }
+    .photoBox img{
+      width: 100%;
+      max-width: 170px;
+      aspect-ratio: 1/1;
+      object-fit: cover;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background:#fafafa;
+    }
+    .photoBox .cap{
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .sectionTitle{
+      margin: 10px 0 10px;
+      font-weight: 700;
+      font-size: 15px;
+    }
+
+    .dueRow{
+      display:flex;
+      gap: 12px;
+      align-items:center;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background:#f9fafb;
+      min-width: 220px;
+    }
+    .pill .small{
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .pill .big{
+      color: red;
+      font-weight: 800;
+      font-size: 18px;
+    }
+
+    table{
+      width:100%;
+      border-collapse: collapse;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow:hidden;
+    }
+    th, td{
+      padding: 10px 10px;
+      border-bottom: 1px solid var(--line);
+      text-align:left;
+      font-size: 14px;
+    }
+    th{
+      background:#f9fafb;
+      color:#374151;
+      font-size: 13px;
+    }
+    tr:last-child td{ border-bottom: none; }
+
+    .payBox{
+      display:grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 10px;
+      align-items:end;
+    }
+    .field label{
+      display:block;
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .field input{
+      width:100%;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      outline: none;
+      font-size: 14px;
+    }
+    .field input:focus{
+      border-color:#9ca3af;
+    }
+
+    .msg{
+      margin-top: 12px;
+      font-size: 13px;
+    }
+    .msg.err{ color: var(--danger); }
+    .msg.ok{ color: var(--ok); }
+
+    .footerHint{
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    @media (max-width: 760px){
+      .top{ grid-template-columns: 1fr; }
+      .payBox{ grid-template-columns: 1fr; }
+      .header{ align-items:flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="page">
+    <div class="header">
+      <h1>Student Dashboard</h1>
+      <div class="actions">
+        <button class="btn secondary" id="refreshBtn">Refresh</button>
+        <button class="btn danger" id="logoutBtn">Logout</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="top">
+        <!-- LEFT: Student info -->
+        <div>
+          <div class="infoGrid">
+            <div class="label">Name</div> <div class="value" id="name">—</div>
+            <div class="label">ID</div>   <div class="value" id="studentId">—</div>
+            <div class="label">Dept</div> <div class="value" id="dept">—</div>
+            <div class="label">Hall</div> <div class="value" id="hall">—</div>
+            <div class="label">Room</div> <div class="value" id="room">—</div>
+          </div>
+        </div>
+
+        <!-- RIGHT: Photo -->
+        <div class="photoBox">
+          <img id="photo" alt="Student photo" src="" />
+          <div class="cap">Picture of the student</div>
+        </div>
+      </div>
+
+      <div class="sectionTitle">Due Summary</div>
+      <div class="dueRow">
+        <div class="pill">
+          <div>
+            <div class="small">Total Due</div>
+            <div class="big" id="totalDue">৳ 0</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sectionTitle">Details of Due</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Amount</th>
+          </tr>
+        </thead>
+        <tbody id="dueBody">
+          <!-- rows inserted by JS -->
+        </tbody>
+      </table>
+
+      <div class="sectionTitle" style="margin-top:16px;">Pay Due Now</div>
+      <form id="payForm" class="payBox">
+        <div class="field">
+          <label for="account">Account</label>
+          <input id="account" placeholder="e.g., bkash/rocket/bank account" required />
+        </div>
+        <div class="field">
+          <label for="amount">Amount</label>
+          <input id="amount" type="number" min="1" step="1" placeholder="e.g., 500" required />
+        </div>
+        <button class="btn" type="submit" id="payBtn">Pay</button>
+      </form>
+
+      <div id="message" class="msg"></div>
+      <div class="footerHint">
+        This page reads token/role from <code>localStorage</code> and loads profile from API using the token.
+      </div>
+    </div>
+  </div>
+
+  <!-- <script>
+    // =========================
+    // 1) AUTH GUARD (your code)
+    // =========================
+    const token = localStorage.getItem("token");
+    const role = (localStorage.getItem("role") || "").toLowerCase();
+
+    if (!token) window.location.href = "login.html";
+    if (role && role !== "student1") {
+      if (role === "librarian") window.location.href = "librarian.html";
+      if (role === "hall_manager") window.location.href = "hall.html";
+      if (role === "department_officer") window.location.href = "department.html";
+    }
+
+    // =========================
+    // 2) CONFIG
+    // =========================
+    // Change this to your backend URL
+    const API_BASE = "http://localhost:5000";
+
+    // DOM refs
+    const elName = document.getElementById("name");
+    const elStudentId = document.getElementById("studentId");
+    const elDept = document.getElementById("dept");
+    const elHall = document.getElementById("hall");
+    const elRoom = document.getElementById("room");
+    const elPhoto = document.getElementById("photo");
+    const elTotalDue = document.getElementById("totalDue");
+    const dueBody = document.getElementById("dueBody");
+    const msg = document.getElementById("message");
+
+    const refreshBtn = document.getElementById("refreshBtn");
+    const logoutBtn = document.getElementById("logoutBtn");
+
+    const payForm = document.getElementById("payForm");
+    const payBtn = document.getElementById("payBtn");
+
+    function showMsg(text, type="ok"){
+      msg.textContent = text;
+      msg.className = "msg " + (type === "ok" ? "ok" : "err");
+    }
+
+    function money(n){
+      const num = Number(n || 0);
+      return "৳ " + num.toLocaleString("en-US");
+    }
+
+    // =========================
+    // 3) RENDER FUNCTION
+    // =========================
+    function renderStudent(data){
+      // expected shape example:
+      // {
+      //   name, studentId, dept, hall, room,
+      //   photoUrl,
+      //   due: { total: 1200, items:[{title:"Hall Fee", amount:600},{title:"Library Fine",amount:600}] }
+      // }
+
+      elName.textContent = data?.name ?? "—";
+      elStudentId.textContent = data?.studentId ?? "—";
+      elDept.textContent = data?.dept ?? "—";
+      elHall.textContent = data?.hall ?? "—";
+      elRoom.textContent = data?.room ?? "—";
+
+      // photo fallback
+      elPhoto.src = data?.photoUrl || "https://via.placeholder.com/300?text=Student+Photo";
+
+      // due
+      const total = data?.due?.total ?? 0;
+      elTotalDue.textContent = money(total);
+
+      // table
+      dueBody.innerHTML = "";
+      const items = data?.due?.items ?? [];
+      if (!items.length){
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td colspan="2" style="color:#6b7280;">No dues found.</td>`;
+        dueBody.appendChild(tr);
+      } else {
+        for (const it of items){
+          const tr = document.createElement("tr");
+          tr.innerHTML = `<td>${it.title ?? "-"}</td><td>${money(it.amount ?? 0)}</td>`;
+          dueBody.appendChild(tr);
+        }
+      }
+    }
+
+    // =========================
+    // 4) LOAD DATA (API first, localStorage fallback)
+    // =========================
+    async function loadStudent(){
+      showMsg("Loading...", "ok");
+
+      // A) Try backend API (recommended)
+      try {
+        // Example endpoint: GET /api/student/me
+        const res = await fetch(`${API_BASE}/api/student/me`, {
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}` // token from login page
+          }
+        });
+
+        // If token invalid, redirect to login
+        if (res.status === 401 || res.status === 403) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("role");
+          showMsg("Session expired. Redirecting to login...", "err");
+          setTimeout(() => window.location.href = "login.html", 600);
+          return;
+        }
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.message || "Failed to load profile from API.");
+        }
+
+        const data = await res.json();
+        renderStudent(data);
+        showMsg("Loaded from backend ✅", "ok");
+        return;
+
+      } catch (e) {
+        // B) Fallback: load from localStorage demo data
+        // (You can save these from login page too.)
+        const fallback = localStorage.getItem("student_profile");
+        if (fallback) {
+          renderStudent(JSON.parse(fallback));
+          showMsg("Loaded from localStorage (demo) ✅", "ok");
+          return;
+        }
+
+        // C) Last fallback: show sample mock
+        const mock = {
+          name: "Demo Student",
+          studentId: "2203177",
+          dept: "CSE",
+          hall: "Bangabandhu Hall",
+          room: "B-203",
+          photoUrl: "https://via.placeholder.com/300?text=Student+Photo",
+          due: {
+            total: 1200,
+            items: [
+              { title: "Hall Fee", amount: 600 },
+              { title: "Library Fine", amount: 300 },
+              { title: "Department Fee", amount: 300 }
+            ]
+          }
+        };
+        renderStudent(mock);
+        showMsg("Backend not reachable. Showing mock data ⚠️", "err");
+      }
+    }
+
+    // =========================
+    // 5) PAY DUE (sample)
+    // =========================
+    payForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      showMsg("", "ok");
+
+      const account = document.getElementById("account").value.trim();
+      const amount = Number(document.getElementById("amount").value);
+
+      if (!account || !amount || amount <= 0) {
+        showMsg("Please enter valid account and amount.", "err");
+        return;
+      }
+
+      payBtn.disabled = true;
+      payBtn.textContent = "Paying...";
+
+      try {
+        // Example endpoint: POST /api/payments
+        const res = await fetch(`${API_BASE}/api/payments`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({ account, amount })
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          showMsg(data.message || "Payment failed.", "err");
+          return;
+        }
+
+        showMsg("Payment successful ✅ Refreshing dues...", "ok");
+        payForm.reset();
+        await loadStudent();
+
+      } catch (err) {
+        showMsg("Backend not reachable. Payment not sent.", "err");
+      } finally {
+        payBtn.disabled = false;
+        payBtn.textContent = "Pay";
+      }
+    });
+
+    // =========================
+    // 6) Buttons
+    // =========================
+    refreshBtn.addEventListener("click", loadStudent);
+
+    logoutBtn.addEventListener("click", () => {
+      localStorage.clear();
+      window.location.href = "login.html";
+    });
+
+    // =========================
+    // 7) Start
+    // =========================
+    loadStudent();
+  </script> -->
+
+<script>
+  // =========================
+  // 1) AUTH GUARD
+  // =========================
+  const token = localStorage.getItem("token");
+  const role = (localStorage.getItem("role") || "").toLowerCase();
+
+  if (!token) window.location.href = "login.html";
+
+  if (role && role !== "student1") {
+    if (role === "librarian") window.location.href = "librarian.html";
+    if (role === "hall_manager") window.location.href = "hall.html";
+    if (role === "department_officer") window.location.href = "department.html";
+  }
+
+  // =========================
+  // 2) CONFIG
+  // =========================
+  const API_BASE = "http://127.0.0.1:5000";
+
+  // DOM refs
+  const elName = document.getElementById("name");
+  const elStudentId = document.getElementById("studentId");
+  const elDept = document.getElementById("dept");
+  const elHall = document.getElementById("hall");
+  const elRoom = document.getElementById("room");
+  const elPhoto = document.getElementById("photo");
+  const elTotalDue = document.getElementById("totalDue");
+  const dueBody = document.getElementById("dueBody");
+  const msg = document.getElementById("message");
+
+  const refreshBtn = document.getElementById("refreshBtn");
+  const logoutBtn = document.getElementById("logoutBtn");
+
+  const payForm = document.getElementById("payForm");
+  const payBtn = document.getElementById("payBtn");
+
+  function showMsg(text, type = "ok") {
+    msg.textContent = text;
+    msg.className = "msg " + (type === "ok" ? "ok" : "err");
+  }
+
+  function money(n) {
+    const num = Number(n || 0);
+    return "৳ " + num.toLocaleString("en-US");
+  }
+
+  // =========================
+  // 3) RENDER FUNCTION
+  // =========================
+  function renderStudent(data) {
+    elName.textContent = data?.name ?? "—";
+    elStudentId.textContent = data?.studentId ?? "—";
+    elDept.textContent = data?.dept ?? "—";
+    elHall.textContent = data?.hall ?? "—";
+    elRoom.textContent = data?.room ?? "—";
+
+    // photo (static for now)
+    elPhoto.src = "https://via.placeholder.com/300?text=Student+Photo";
+
+    // due (mock for now)
+    const total = data?.due?.total ?? 0;
+    elTotalDue.textContent = money(total);
+
+    dueBody.innerHTML = "";
+
+    const items = data?.due?.items ?? [];
+
+    if (!items.length) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td colspan="2" style="color:#6b7280;">No dues found.</td>`;
+      dueBody.appendChild(tr);
+    } else {
+      for (const it of items) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${it.title ?? "-"}</td>
+          <td>${money(it.amount ?? 0)}</td>
+        `;
+        dueBody.appendChild(tr);
+      }
+    }
+  }
+
+  // =========================
+  // 4) LOAD DATA FROM DATABASE
+  // =========================
+  async function loadStudent() {
+    showMsg("Loading from database...", "ok");
+
+    try {
+      // Get student ID from localStorage
+      const studentId = localStorage.getItem("studentId") || "2203177";
+
+      const res = await fetch(`${API_BASE}/api/student/${studentId}`);
+
+      if (!res.ok) {
+        throw new Error("Failed to load student data.");
+      }
+
+      const data = await res.json();
+
+      renderStudent(data);
+      showMsg("Loaded from database ✅", "ok");
+
+    } catch (err) {
+      showMsg("Backend not reachable ❌", "err");
+    }
+  }
+
+  // =========================
+  // 5) PAY DUE (still mock)
+  // =========================
+  payForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+
+    const account = document.getElementById("account").value.trim();
+    const amount = Number(document.getElementById("amount").value);
+
+    if (!account || !amount || amount <= 0) {
+      showMsg("Please enter valid account and amount.", "err");
+      return;
+    }
+
+    showMsg("Payment simulated successfully ✅", "ok");
+    payForm.reset();
+  });
+
+  // =========================
+  // 6) BUTTONS
+  // =========================
+  refreshBtn.addEventListener("click", loadStudent);
+
+  logoutBtn.addEventListener("click", () => {
+    localStorage.clear();
+    window.location.href = "login.html";
+  });
+
+  // =========================
+  // 7) START
+  // =========================
+  loadStudent();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RUET Portal - Login</title>
+
+  <style>
+    body{
+        margin:0;
+        font-family: Arial, sans-serif;
+        background: url("media/ruet_main_gate.jpg") center/cover no-repeat fixed;
+    }
+
+    /* dark overlay so text readable */
+    .wrap{
+        min-height:100vh;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        padding:20px;
+        background: rgba(0,0,0,0.35);
+    }
+
+    /* login box background image */
+    .card{
+        width:100%;
+        max-width:420px;
+        border-radius:12px;
+        padding:22px;
+
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0,0,0,.18);
+        opacity: 0.6;
+    }
+
+    /* optional: white overlay inside card so inputs readable */
+    .card::before{
+        content:"";
+        position:absolute;
+        inset:0;
+        background: rgba(255,255,255,0.88);  /* adjust 0.75–0.95 */
+    }
+
+    /* keep card content above overlay */
+    .card > *{
+        position: relative;
+        z-index: 1;
+    }
+
+    h1 { 
+      margin: 0 0 8px;
+      font-size: 20px;
+    }
+    p { 
+      margin: 0 0 18px;
+      color: #555; 
+      font-size: 14px; 
+    }
+    label { 
+      display: block; 
+      font-size: 13px; 
+      margin: 12px 0 6px; 
+    }
+    input { 
+      width: 97%; 
+      padding: 10px; 
+      border: 1px solid #ddd; 
+      border-radius: 10px; 
+      outline: none; 
+    }
+    input:focus { 
+      border-color: #999; 
+    }
+    button { 
+      width: 100%; 
+      margin-top: 16px; 
+      padding: 12px; 
+      border: none; 
+      border-radius: 10px; 
+      background: #111827; 
+      color: white; 
+      font-size: 15px; 
+      cursor: pointer; 
+    }
+    button:disabled { 
+      opacity: .6; 
+      cursor: not-allowed; 
+    }
+    .msg { 
+      margin-top: 12px; 
+      font-size: 13px; 
+    }
+    .err { 
+      color: #b00020; 
+    }
+    .ok { 
+      color: #0b7a2a; 
+    }
+    .row { 
+      display: flex; 
+      gap: 10px; 
+      align-items: center; 
+      margin-top: 10px; 
+    }
+    .small { 
+      font-size: 12px; 
+      color: #666; 
+    }
+    .link { 
+      color: #2563eb; 
+      cursor: pointer; 
+      text-decoration: underline; 
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>RUET Online Portal</h1>
+      <p>Login to access your dashboard.</p>
+
+      <form id="loginForm">
+        <label for="identifier">ID / Email</label>
+        <input id="identifier" name="identifier" placeholder="e.g., 2203177 or email" required />
+
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" placeholder="Enter password" required />
+
+        <button id="btn" type="submit">Login</button>
+        <div id="message" class="msg"></div>
+
+        <div class="row">
+          <span class="small">Backend URL:</span>
+          <span class="small" id="apiUrlText"></span>
+        </div>
+      </form>
+
+      <p class="small" style="margin-top:14px;">
+        Demo tip: Your backend should return <code>{ token, role }</code>.
+      </p>
+    </div>
+  </div>
+
+  <script>
+  // Change this when you deploy:
+  const API_BASE = "http://localhost:5000";
+  document.getElementById("apiUrlText").textContent = API_BASE;
+
+  const form = document.getElementById("loginForm");
+  const btn = document.getElementById("btn");
+  const message = document.getElementById("message");
+
+  // ===== DEMO USERS (Frontend-only) =====
+  const DEMO_USERS = {
+    "2203177": { password: "720", role: "student" },
+    "lib001":  { password: "123456", role: "librarian" },
+    "hall001": { password: "123456", role: "hall_manager" },
+    "dept001": { password: "123456", role: "department_officer" }
+  };
+
+  function showMsg(text, type) {
+    message.textContent = text;
+    message.className = "msg " + (type === "ok" ? "ok" : "err");
+  }
+
+  function redirectByRole(role) {
+    const r = (role || "").toLowerCase();
+    if (r === "student") window.location.href = "student1.html";
+    else if (r === "hall_manager") window.location.href = "hall.html";
+    else if (r === "department_officer") window.location.href = "department.html";
+    else if (r === "librarian") window.location.href = "librarian.html";
+    else showMsg("Unknown role: " + role, "err");
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    showMsg("", "ok");
+
+    const identifier = document.getElementById("identifier").value.trim();
+    const password = document.getElementById("password").value;
+
+    btn.disabled = true;
+    btn.textContent = "Logging in...";
+
+    // ===== 1) DEMO LOGIN (NO BACKEND NEEDED) =====
+    if (DEMO_USERS[identifier] && DEMO_USERS[identifier].password === password) {
+      localStorage.setItem("token", "demo-token");
+      localStorage.setItem("role", DEMO_USERS[identifier].role);
+
+      showMsg("Demo login successful. Redirecting...", "ok");
+      setTimeout(() => redirectByRole(DEMO_USERS[identifier].role), 300);
+
+      btn.disabled = false;
+      btn.textContent = "Login";
+      return;
+    }
+
+    // ===== 2) REAL BACKEND LOGIN =====
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identifier, password })
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        showMsg(data.message || "Login failed. Check credentials.", "err");
+        return;
+      }
+
+      // Expected: { token: "...", role: "student" }
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("role", data.role);
+
+      showMsg("Login successful. Redirecting...", "ok");
+      setTimeout(() => redirectByRole(data.role), 300);
+
+    } catch (err) {
+      showMsg("Backend not reachable. Use demo IDs like 2203177/123456.", "err");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Login";
+    }
+  });
+</script>
+
+</body>
+</html>

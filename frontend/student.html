@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Student Dashboard - RUET Portal</title>
+
+  <style>
+    :root{
+      --bg:#f5f6f8; --card:#fff; --text:#111827; --muted:#6b7280;
+      --border:#e5e7eb; --dark:#111827;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Arial, sans-serif;background:var(--bg);color:var(--text)}
+    .layout{display:flex;min-height:100vh}
+    .sidebar{
+      width:260px;background:var(--dark);color:#fff;padding:18px;position:sticky;top:0;height:100vh
+    }
+    .brand{font-weight:700;font-size:18px;line-height:1.2}
+    .brand small{display:block;font-weight:400;opacity:.8;margin-top:4px}
+    .nav{margin-top:18px;display:flex;flex-direction:column;gap:8px}
+    .nav a{
+      color:#e5e7eb;text-decoration:none;padding:10px 12px;border-radius:10px;display:block
+    }
+    .nav a.active,.nav a:hover{background:rgba(255,255,255,.12)}
+    .spacer{flex:1}
+    .logout{
+      width:100%;border:none;border-radius:10px;padding:10px 12px;background:#ef4444;color:#fff;
+      cursor:pointer;font-weight:600
+    }
+    .content{flex:1;padding:22px}
+    .topbar{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:16px}
+    .title h1{margin:0;font-size:20px}
+    .title p{margin:4px 0 0;color:var(--muted);font-size:13px}
+    .pill{
+      background:#fff;border:1px solid var(--border);border-radius:999px;padding:8px 12px;font-size:12px;color:var(--muted)
+    }
+    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
+    .card{
+      background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px
+    }
+    .card h2{margin:0 0 8px;font-size:14px}
+    .meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .kv{padding:10px;border:1px solid var(--border);border-radius:12px}
+    .kv .k{font-size:12px;color:var(--muted)}
+    .kv .v{margin-top:4px;font-weight:700}
+    .kpi{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    .kpi .kv .v{font-size:18px}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px;border-bottom:1px solid var(--border);text-align:left;font-size:13px}
+    th{color:var(--muted);font-weight:700}
+    .badge{
+      display:inline-block;padding:4px 10px;border-radius:999px;font-size:12px;border:1px solid var(--border)
+    }
+    .ok{background:#ecfdf5;border-color:#a7f3d0}
+    .warn{background:#fff7ed;border-color:#fed7aa}
+    .bad{background:#fef2f2;border-color:#fecaca}
+    .row-actions{display:flex;gap:8px;flex-wrap:wrap}
+    .btn{
+      border:1px solid var(--border);background:#fff;border-radius:10px;padding:8px 10px;cursor:pointer;font-weight:600;font-size:12px
+    }
+    .btn.primary{background:var(--dark);color:#fff;border-color:var(--dark)}
+    .btn:disabled{opacity:.6;cursor:not-allowed}
+    .muted{color:var(--muted);font-size:12px}
+    .col-12{grid-column:span 12}
+    .col-7{grid-column:span 7}
+    .col-5{grid-column:span 5}
+    @media (max-width: 980px){
+      .sidebar{display:none}
+      .col-7,.col-5{grid-column:span 12}
+      .kpi{grid-template-columns:1fr}
+      .meta{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">
+        RUET Portal
+        <small>Student Dashboard</small>
+      </div>
+
+      <nav class="nav">
+        <a class="active" href="student.html">Dashboard</a>
+        <a href="#dues">Dues</a>
+        <a href="#payments">Payment History</a>
+        <a href="#library">Library</a>
+        <a href="#clearance">Clearance</a>
+      </nav>
+
+      <div class="spacer"></div>
+      <button class="logout" id="logoutBtn">Logout</button>
+    </aside>
+
+    <main class="content">
+      <div class="topbar">
+        <div class="title">
+          <h1>Welcome, <span id="studentName">Student</span></h1>
+          <p>ID: <span id="studentId">—</span> • Hall: <span id="studentHall">—</span> • Room: <span id="studentRoom">—</span></p>
+        </div>
+        <div class="pill" id="clearancePill">Clearance: —</div>
+      </div>
+
+      <section class="grid">
+        <div class="card col-12">
+          <h2>Quick Summary</h2>
+          <div class="kpi">
+            <div class="kv">
+              <div class="k">Total Due (BDT)</div>
+              <div class="v" id="totalDue">0</div>
+            </div>
+            <div class="kv">
+              <div class="k">Overdue Library Fine (BDT)</div>
+              <div class="v" id="libraryFine">0</div>
+            </div>
+            <div class="kv">
+              <div class="k">Last Payment</div>
+              <div class="v" id="lastPayment">—</div>
+            </div>
+          </div>
+          <div class="row-actions" style="margin-top:10px;">
+            <button class="btn primary" id="payAllBtn">Pay Now (Mock)</button>
+            <button class="btn" id="refreshBtn">Refresh</button>
+            <span class="muted" id="statusText"></span>
+          </div>
+        </div>
+
+        <div class="card col-5">
+          <h2>Profile</h2>
+          <div class="meta">
+            <div class="kv"><div class="k">Department</div><div class="v" id="studentDept">—</div></div>
+            <div class="kv"><div class="k">Session</div><div class="v" id="studentSession">—</div></div>
+            <div class="kv"><div class="k">Seat Type</div><div class="v" id="seatType">—</div></div>
+            <div class="kv"><div class="k">Email</div><div class="v" id="studentEmail">—</div></div>
+          </div>
+        </div>
+
+        <div class="card col-7" id="dues">
+          <h2>Current Dues</h2>
+          <div class="muted" style="margin-bottom:8px;">Hall + Department + Registration + Library fines (if any)</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Fee Type</th>
+                <th>Month/Semester</th>
+                <th>Amount (BDT)</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="duesBody">
+              <tr><td colspan="4" class="muted">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card col-7" id="payments">
+          <h2>Payment History</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Receipt No</th>
+                <th>Amount (BDT)</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="paymentsBody">
+              <tr><td colspan="4" class="muted">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card col-5" id="library">
+          <h2>Library Activity</h2>
+          <div class="muted" style="margin-bottom:8px;">Borrowed books, due dates, and fine calculation</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Book</th>
+                <th>Due</th>
+                <th>Fine</th>
+              </tr>
+            </thead>
+            <tbody id="libraryBody">
+              <tr><td colspan="3" class="muted">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card col-12" id="clearance">
+          <h2>Clearance Status</h2>
+          <p class="muted" style="margin:0;">
+            Clearance is <b>Cleared</b> if you have <b>no unpaid dues</b> and <b>no overdue library fines</b>.
+          </p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    // ===== CONFIG =====
+    const API_BASE = "http://localhost:5000";
+
+    // ===== AUTH GUARD =====
+    const token = localStorage.getItem("token");
+    const role = (localStorage.getItem("role") || "").toLowerCase();
+
+    if (!token) window.location.href = "login.html";
+    if (role && role !== "student") {
+      // If logged in as another role, redirect accordingly
+      if (role === "librarian") window.location.href = "librarian.html";
+      if (role === "hall_manager") window.location.href = "hall.html";
+      if (role === "department_officer") window.location.href = "department.html";
+    }
+
+    // localStorage.setItem("studentId",localStorage.getItem("identifier"))
+    const $ = (id) => document.getElementById(id);
+    const statusText = $("statusText");
+
+    function setStatus(text) { statusText.textContent = text || ""; }
+
+    function money(n){ return (Number(n)||0).toFixed(0); }
+
+    function badge(status){
+      const s = (status || "").toLowerCase();
+      if (s === "paid") return `<span class="badge ok">PAID</span>`;
+      if (s === "unpaid") return `<span class="badge bad">UNPAID</span>`;
+      if (s === "overdue") return `<span class="badge warn">OVERDUE</span>`;
+      return `<span class="badge">${status || "—"}</span>`;
+    }
+
+    async function api(path, options = {}) {
+      const res = await fetch(`${API_BASE}${path}`, {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+          ...(options.headers || {})
+        }
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || "Request failed");
+      return data;
+    }
+
+    // ===== LOAD DATA (replace endpoints later if your backend uses different routes) =====
+    async function loadDashboard(){
+      try {
+        setStatus("Loading dashboard…");
+
+        // 1) Profile
+        // Expected: { name,id,dept,session,email,hall,room,seatType }
+        const profile = await api("/api/student/me");
+        $("studentName").textContent = profile.name || "Student";
+        $("studentId").textContent = profile.id || profile.identifier || "—";
+        $("studentDept").textContent = profile.dept || "—";
+        $("studentSession").textContent = profile.session || "—";
+        $("studentEmail").textContent = profile.email || "—";
+        $("studentHall").textContent = profile.hall || "—";
+        $("studentRoom").textContent = profile.room || "—";
+        $("seatType").textContent = profile.seatType || "—";
+
+        // 2) Dues
+        // Expected: { items:[{feeType, period, amount, status}] }
+        const dues = await api("/api/student/dues");
+        const duesBody = $("duesBody");
+        if (!dues.items || dues.items.length === 0) {
+          duesBody.innerHTML = `<tr><td colspan="4" class="muted">No dues found.</td></tr>`;
+        } else {
+          duesBody.innerHTML = dues.items.map(x => `
+            <tr>
+              <td>${x.feeType || "-"}</td>
+              <td>${x.period || "-"}</td>
+              <td>${money(x.amount)}</td>
+              <td>${badge(x.status)}</td>
+            </tr>
+          `).join("");
+        }
+
+        const totalDue = (dues.items || [])
+          .filter(x => (x.status || "").toLowerCase() !== "paid")
+          .reduce((sum, x) => sum + (Number(x.amount) || 0), 0);
+        $("totalDue").textContent = money(totalDue);
+
+        // 3) Payments
+        // Expected: { items:[{date, receiptNo, amount, status}] }
+        const payments = await api("/api/student/payments");
+        const payBody = $("paymentsBody");
+        if (!payments.items || payments.items.length === 0) {
+          payBody.innerHTML = `<tr><td colspan="4" class="muted">No payments yet.</td></tr>`;
+          $("lastPayment").textContent = "—";
+        } else {
+          payBody.innerHTML = payments.items.map(p => `
+            <tr>
+              <td>${p.date || "-"}</td>
+              <td>${p.receiptNo || "-"}</td>
+              <td>${money(p.amount)}</td>
+              <td>${badge(p.status)}</td>
+            </tr>
+          `).join("");
+          const last = payments.items[0];
+          $("lastPayment").textContent = `${last.date || ""} • ${money(last.amount)} BDT`;
+        }
+
+        // 4) Library
+        // Expected: { items:[{title, dueDate, fine, status}] }
+        const library = await api("/api/student/library");
+        const libBody = $("libraryBody");
+        if (!library.items || library.items.length === 0) {
+          libBody.innerHTML = `<tr><td colspan="3" class="muted">No borrowed books.</td></tr>`;
+          $("libraryFine").textContent = "0";
+        } else {
+          libBody.innerHTML = library.items.map(b => `
+            <tr>
+              <td>${b.title || "-"}</td>
+              <td>${b.dueDate || "-"}</td>
+              <td>${money(b.fine || 0)}</td>
+            </tr>
+          `).join("");
+          const fineTotal = library.items.reduce((sum,b)=> sum + (Number(b.fine)||0), 0);
+          $("libraryFine").textContent = money(fineTotal);
+        }
+
+        // 5) Clearance
+        // Expected: { status: "CLEARED" | "NOT_CLEARED", reason?: string }
+        const clearance = await api("/api/student/clearance");
+        const st = (clearance.status || "").toUpperCase() || "—";
+        if (st === "CLEARED") {
+          $("clearancePill").textContent = "Clearance: CLEARED ✅";
+          $("clearancePill").style.borderColor = "#a7f3d0";
+          $("clearancePill").style.background = "#ecfdf5";
+        } else {
+          $("clearancePill").textContent = "Clearance: NOT CLEARED ❌";
+          $("clearancePill").style.borderColor = "#fecaca";
+          $("clearancePill").style.background = "#fef2f2";
+        }
+
+        setStatus("Loaded.");
+      } catch (e) {
+        setStatus(e.message || "Failed to load.");
+      }
+    }
+
+    // ===== ACTIONS =====
+    $("refreshBtn").addEventListener("click", loadDashboard);
+
+    $("payAllBtn").addEventListener("click", async () => {
+      try {
+        setStatus("Processing mock payment…");
+        $("payAllBtn").disabled = true;
+
+        // Expected: returns { message, receiptNo }
+        const res = await api("/api/payments/mock", { method: "POST" });
+        setStatus(res.message || ("Payment success. Receipt: " + (res.receiptNo || "—")));
+        await loadDashboard();
+      } catch (e) {
+        setStatus(e.message || "Payment failed.");
+      } finally {
+        $("payAllBtn").disabled = false;
+      }
+    });
+
+    $("logoutBtn").addEventListener("click", () => {
+      localStorage.removeItem("token");
+      localStorage.removeItem("role");
+      window.location.href = "login.html";
+    });
+
+    // Load on start
+    loadDashboard();
+  </script>
+</body>
+</html>

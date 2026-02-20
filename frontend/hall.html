@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hall Manager Dashboard - RUET Portal</title>
+
+  <style>
+    :root{
+      --bg:#f5f6f8; --card:#fff; --text:#111827; --muted:#6b7280;
+      --border:#e5e7eb; --dark:#111827;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Arial, sans-serif;background:var(--bg);color:var(--text)}
+    .layout{display:flex;min-height:100vh}
+    .sidebar{
+      width:270px;background:var(--dark);color:#fff;padding:18px;position:sticky;top:0;height:100vh
+    }
+    .brand{font-weight:700;font-size:18px;line-height:1.2}
+    .brand small{display:block;font-weight:400;opacity:.8;margin-top:4px}
+    .nav{margin-top:18px;display:flex;flex-direction:column;gap:8px}
+    .nav a{color:#e5e7eb;text-decoration:none;padding:10px 12px;border-radius:10px;display:block}
+    .nav a.active,.nav a:hover{background:rgba(255,255,255,.12)}
+    .spacer{flex:1}
+    .logout{
+      width:100%;border:none;border-radius:10px;padding:10px 12px;background:#ef4444;color:#fff;
+      cursor:pointer;font-weight:800
+    }
+
+    .content{flex:1;padding:22px}
+    .topbar{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:16px}
+    .title h1{margin:0;font-size:20px}
+    .title p{margin:4px 0 0;color:var(--muted);font-size:13px}
+    .pill{
+      background:#fff;border:1px solid var(--border);border-radius:999px;padding:8px 12px;font-size:12px;color:var(--muted)
+    }
+
+    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px}
+    .card h2{margin:0 0 10px;font-size:14px}
+
+    .kpi{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+    .kv{padding:10px;border:1px solid var(--border);border-radius:12px}
+    .kv .k{font-size:12px;color:var(--muted)}
+    .kv .v{margin-top:4px;font-weight:900;font-size:18px}
+
+    .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    label{display:block;font-size:12px;color:var(--muted);margin:10px 0 6px}
+    input,select{
+      width:100%;padding:10px;border:1px solid var(--border);border-radius:10px;outline:none;background:#fff
+    }
+    input:focus,select:focus{border-color:#9ca3af}
+
+    .row-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+    .btn{
+      border:1px solid var(--border);background:#fff;border-radius:10px;padding:9px 10px;
+      cursor:pointer;font-weight:800;font-size:12px
+    }
+    .btn.primary{background:var(--dark);color:#fff;border-color:var(--dark)}
+    .btn:disabled{opacity:.6;cursor:not-allowed}
+
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px;border-bottom:1px solid var(--border);text-align:left;font-size:13px}
+    th{color:var(--muted);font-weight:900}
+    .badge{display:inline-block;padding:4px 10px;border-radius:999px;font-size:12px;border:1px solid var(--border)}
+    .ok{background:#ecfdf5;border-color:#a7f3d0}
+    .bad{background:#fef2f2;border-color:#fecaca}
+    .muted{color:var(--muted);font-size:12px}
+
+    .col-12{grid-column:span 12}
+    .col-8{grid-column:span 8}
+    .col-6{grid-column:span 6}
+    .col-4{grid-column:span 4}
+
+    @media (max-width: 980px){
+      .sidebar{display:none}
+      .kpi{grid-template-columns:1fr 1fr}
+      .col-8,.col-4,.col-6{grid-column:span 12}
+      .form-grid{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">
+        RUET Portal
+        <small>Hall Manager Dashboard</small>
+      </div>
+
+      <nav class="nav">
+        <a class="active" href="hall.html">Dashboard</a>
+        <a href="#allocate">Room Allocation</a>
+        <a href="#fees">Monthly Hall Fee</a>
+        <a href="#allocations">Allocations</a>
+        <a href="#dues">Hall Dues</a>
+      </nav>
+
+      <div class="spacer"></div>
+      <button class="logout" id="logoutBtn">Logout</button>
+    </aside>
+
+    <main class="content">
+      <div class="topbar">
+        <div class="title">
+          <h1>Hall Management</h1>
+          <p>Room allocation • Monthly hall fees • Hall due tracking</p>
+        </div>
+        <div class="pill" id="modePill">Mode: —</div>
+      </div>
+
+      <section class="grid">
+        <!-- Summary -->
+        <div class="card col-12">
+          <h2>Summary</h2>
+          <div class="kpi">
+            <div class="kv"><div class="k">Total Rooms</div><div class="v" id="totalRooms">0</div></div>
+            <div class="kv"><div class="k">Allocated Seats</div><div class="v" id="allocatedSeats">0</div></div>
+            <div class="kv"><div class="k">Unpaid Students</div><div class="v" id="unpaidCount">0</div></div>
+            <div class="kv"><div class="k">Monthly Fee (BDT)</div><div class="v" id="monthlyFee">0</div></div>
+          </div>
+
+          <div class="row-actions">
+            <button class="btn" id="refreshBtn">Refresh</button>
+            <span class="muted" id="statusText"></span>
+          </div>
+        </div>
+
+        <!-- Room Allocation -->
+        <div class="card col-8" id="allocate">
+          <h2>Allocate Room</h2>
+          <div class="form-grid">
+            <div>
+              <label>Hall Name</label>
+              <input id="hallName" placeholder="e.g., Bangabandhu Hall" />
+            </div>
+            <div>
+              <label>Room Number</label>
+              <input id="roomNo" placeholder="e.g., 204" />
+            </div>
+            <div>
+              <label>Allocation Type</label>
+              <select id="allocType">
+                <option value="single">Single (1 student)</option>
+                <option value="shared4">Shared (4 students)</option>
+              </select>
+            </div>
+            <div>
+              <label>Seat No (optional)</label>
+              <input id="seatNo" placeholder="e.g., A / 1" />
+            </div>
+          </div>
+
+          <label style="margin-top:12px;">Student IDs (enter 1 or 4 IDs based on allocation type)</label>
+          <input id="studentIds" placeholder="e.g., 2203177, 2203188, 2203190, 2203201" />
+
+          <div class="row-actions">
+            <button class="btn primary" id="allocateBtn">Allocate</button>
+            <button class="btn" id="deallocateBtn">Deallocate (Demo)</button>
+          </div>
+
+          <p class="muted" style="margin-top:10px;">
+            Later backend API: <code>POST /api/hall/allocate</code>, <code>DELETE /api/hall/allocate/:id</code>
+          </p>
+        </div>
+
+        <!-- Monthly Fee -->
+        <div class="card col-4" id="fees">
+          <h2>Create Monthly Hall Fee</h2>
+          <label>Month</label>
+          <input id="feeMonth" type="month" />
+
+          <label>Amount (BDT)</label>
+          <input id="feeAmount" type="number" min="0" step="1" placeholder="e.g., 500" />
+
+          <label>Deadline (optional)</label>
+          <input id="feeDeadline" type="date" />
+
+          <div class="row-actions">
+            <button class="btn primary" id="createFeeBtn">Create Fee</button>
+          </div>
+
+          <p class="muted" style="margin-top:10px;">
+            Later backend API: <code>POST /api/hall/fees/monthly</code>
+          </p>
+        </div>
+
+        <!-- Allocations Table -->
+        <div class="card col-12" id="allocations">
+          <h2>Current Allocations</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Allocation ID</th>
+                <th>Hall</th>
+                <th>Room</th>
+                <th>Type</th>
+                <th>Students</th>
+              </tr>
+            </thead>
+            <tbody id="allocBody">
+              <tr><td colspan="5" class="muted">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Hall dues -->
+        <div class="card col-12" id="dues">
+          <h2>Hall Dues (Demo)</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Student</th>
+                <th>Month</th>
+                <th>Amount</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="duesBody">
+              <tr><td colspan="4" class="muted">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    // ===== AUTH GUARD =====
+    const token = localStorage.getItem("token");
+    const role = (localStorage.getItem("role") || "").toLowerCase();
+
+    if (!token) window.location.href = "login.html";
+    if (role && role !== "hall_manager") {
+      if (role === "student") window.location.href = "student.html";
+      else if (role === "librarian") window.location.href = "librarian.html";
+      else if (role === "department_officer") window.location.href = "department.html";
+      else window.location.href = "login.html";
+    }
+
+    const $ = (id) => document.getElementById(id);
+    const statusText = $("statusText");
+
+    function setStatus(text){ statusText.textContent = text || ""; }
+    function money(n){ return (Number(n)||0).toFixed(0); }
+    function badgePaid(status){
+      const s = (status || "").toLowerCase();
+      if (s === "paid") return `<span class="badge ok">PAID</span>`;
+      return `<span class="badge bad">UNPAID</span>`;
+    }
+    function setModePill(){
+      $("modePill").textContent = "Mode: Demo";
+    }
+
+    // ===== DEMO STATE =====
+    const DEMO = {
+      monthlyFee: 500,
+      roomsTotal: 120,
+      allocations: [
+        { id: "AL-1001", hall: "Bangabandhu Hall", room: "204", type: "Shared (4)", students: ["2203177","2203188","2203190","2203201"] },
+        { id: "AL-1002", hall: "Bangamata Hall", room: "105", type: "Single (1)", students: ["2203222"] }
+      ],
+      dues: [
+        { studentId: "2203177", month: "2026-02", amount: 500, status: "unpaid" },
+        { studentId: "2203188", month: "2026-02", amount: 500, status: "paid" },
+        { studentId: "2203222", month: "2026-02", amount: 500, status: "unpaid" }
+      ]
+    };
+
+    function render(){
+      $("totalRooms").textContent = String(DEMO.roomsTotal);
+      const allocatedSeats = DEMO.allocations.reduce((s,a)=> s + a.students.length, 0);
+      $("allocatedSeats").textContent = String(allocatedSeats);
+
+      const unpaid = DEMO.dues.filter(d => d.status !== "paid").length;
+      $("unpaidCount").textContent = String(unpaid);
+
+      $("monthlyFee").textContent = money(DEMO.monthlyFee);
+
+      // allocations
+      const allocBody = $("allocBody");
+      if (!DEMO.allocations.length){
+        allocBody.innerHTML = `<tr><td colspan="5" class="muted">No allocations yet.</td></tr>`;
+      } else {
+        allocBody.innerHTML = DEMO.allocations.map(a => `
+          <tr>
+            <td>${a.id}</td>
+            <td>${a.hall}</td>
+            <td>${a.room}</td>
+            <td>${a.type}</td>
+            <td>${a.students.join(", ")}</td>
+          </tr>
+        `).join("");
+      }
+
+      // dues
+      const duesBody = $("duesBody");
+      if (!DEMO.dues.length){
+        duesBody.innerHTML = `<tr><td colspan="4" class="muted">No dues found.</td></tr>`;
+      } else {
+        duesBody.innerHTML = DEMO.dues.map(d => `
+          <tr>
+            <td>${d.studentId}</td>
+            <td>${d.month}</td>
+            <td>${money(d.amount)}</td>
+            <td>${badgePaid(d.status)}</td>
+          </tr>
+        `).join("");
+      }
+    }
+
+    // ===== ACTIONS =====
+    $("refreshBtn").addEventListener("click", () => {
+      setStatus("Refreshed.");
+      render();
+    });
+
+    $("allocateBtn").addEventListener("click", () => {
+      const hall = $("hallName").value.trim() || "Unknown Hall";
+      const room = $("roomNo").value.trim();
+      const type = $("allocType").value;
+      const idsText = $("studentIds").value.trim();
+
+      if (!room || !idsText){
+        setStatus("Please provide Room Number and Student IDs.");
+        return;
+      }
+
+      const ids = idsText.split(",").map(x => x.trim()).filter(Boolean);
+      if (type === "single" && ids.length !== 1){
+        setStatus("Single allocation requires exactly 1 Student ID.");
+        return;
+      }
+      if (type === "shared4" && ids.length !== 4){
+        setStatus("Shared (4) allocation requires exactly 4 Student IDs.");
+        return;
+      }
+
+      const newId = "AL-" + (1000 + DEMO.allocations.length + 1);
+      DEMO.allocations.unshift({
+        id: newId,
+        hall,
+        room,
+        type: (type === "single") ? "Single (1)" : "Shared (4)",
+        students: ids
+      });
+
+      setStatus(`Allocation saved (Demo). Allocation ID: ${newId}`);
+      render();
+    });
+
+    $("deallocateBtn").addEventListener("click", () => {
+      if (!DEMO.allocations.length){
+        setStatus("No allocations to remove.");
+        return;
+      }
+      const removed = DEMO.allocations.shift();
+      setStatus(`Deallocated (Demo): ${removed.id}`);
+      render();
+    });
+
+    $("createFeeBtn").addEventListener("click", () => {
+      const month = $("feeMonth").value;      // YYYY-MM
+      const amount = Number($("feeAmount").value || 0);
+
+      if (!month || amount <= 0){
+        setStatus("Please select Month and enter a valid Amount.");
+        return;
+      }
+
+      DEMO.monthlyFee = amount;
+
+      // demo: create dues for all allocated students
+      const allStudents = [...new Set(DEMO.allocations.flatMap(a => a.students))];
+      allStudents.forEach(sid => {
+        DEMO.dues.unshift({ studentId: sid, month, amount, status: "unpaid" });
+      });
+
+      setStatus(`Monthly fee created (Demo) for ${allStudents.length} students.`);
+      render();
+    });
+
+    $("logoutBtn").addEventListener("click", () => {
+      localStorage.removeItem("token");
+      localStorage.removeItem("role");
+      window.location.href = "login.html";
+    });
+
+    setModePill();
+    render();
+    setStatus("Loaded.");
+  </script>
+</body>
+</html>

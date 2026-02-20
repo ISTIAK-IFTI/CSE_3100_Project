@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Librarian Dashboard - RUET Portal</title>
+
+  <style>
+    :root{
+      --bg:#f5f6f8; --card:#fff; --text:#111827; --muted:#6b7280;
+      --border:#e5e7eb; --dark:#111827;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Arial, sans-serif;background:var(--bg);color:var(--text)}
+    .layout{display:flex;min-height:100vh}
+    .sidebar{
+      width:270px;background:var(--dark);color:#fff;padding:18px;position:sticky;top:0;height:100vh
+    }
+    .brand{font-weight:700;font-size:18px;line-height:1.2}
+    .brand small{display:block;font-weight:400;opacity:.8;margin-top:4px}
+    .nav{margin-top:18px;display:flex;flex-direction:column;gap:8px}
+    .nav a{color:#e5e7eb;text-decoration:none;padding:10px 12px;border-radius:10px;display:block}
+    .nav a.active,.nav a:hover{background:rgba(255,255,255,.12)}
+    .spacer{flex:1}
+    .logout{
+      width:100%;border:none;border-radius:10px;padding:10px 12px;background:#ef4444;color:#fff;
+      cursor:pointer;font-weight:700
+    }
+    .content{flex:1;padding:22px}
+    .topbar{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:16px}
+    .title h1{margin:0;font-size:20px}
+    .title p{margin:4px 0 0;color:var(--muted);font-size:13px}
+    .pill{
+      background:#fff;border:1px solid var(--border);border-radius:999px;padding:8px 12px;font-size:12px;color:var(--muted)
+    }
+
+    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px}
+    .card h2{margin:0 0 10px;font-size:14px}
+    .kpi{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+    .kv{padding:10px;border:1px solid var(--border);border-radius:12px}
+    .kv .k{font-size:12px;color:var(--muted)}
+    .kv .v{margin-top:4px;font-weight:800;font-size:18px}
+
+    .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    label{display:block;font-size:12px;color:var(--muted);margin:10px 0 6px}
+    input,select{
+      width:100%;padding:10px;border:1px solid var(--border);border-radius:10px;outline:none;background:#fff
+    }
+    input:focus,select:focus{border-color:#9ca3af}
+    .row-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+    .btn{
+      border:1px solid var(--border);background:#fff;border-radius:10px;padding:9px 10px;cursor:pointer;font-weight:700;font-size:12px
+    }
+    .btn.primary{background:var(--dark);color:#fff;border-color:var(--dark)}
+    .btn:disabled{opacity:.6;cursor:not-allowed}
+
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px;border-bottom:1px solid var(--border);text-align:left;font-size:13px}
+    th{color:var(--muted);font-weight:800}
+    .badge{display:inline-block;padding:4px 10px;border-radius:999px;font-size:12px;border:1px solid var(--border)}
+    .ok{background:#ecfdf5;border-color:#a7f3d0}
+    .warn{background:#fff7ed;border-color:#fed7aa}
+    .bad{background:#fef2f2;border-color:#fecaca}
+    .muted{color:var(--muted);font-size:12px}
+
+    .col-12{grid-column:span 12}
+    .col-8{grid-column:span 8}
+    .col-6{grid-column:span 6}
+    .col-4{grid-column:span 4}
+
+    @media (max-width: 980px){
+      .sidebar{display:none}
+      .kpi{grid-template-columns:1fr 1fr}
+      .col-8,.col-4,.col-6{grid-column:span 12}
+      .form-grid{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">
+        RUET Portal
+        <small>Librarian Dashboard</small>
+      </div>
+
+      <nav class="nav">
+        <a class="active" href="librarian.html">Dashboard</a>
+        <a href="#issue">Issue Book</a>
+        <a href="#return">Return Book</a>
+        <a href="#overdue">Overdue</a>
+        <a href="#settings">Fine Rules</a>
+      </nav>
+
+      <div class="spacer"></div>
+      <button class="logout" id="logoutBtn">Logout</button>
+    </aside>
+
+    <main class="content">
+      <div class="topbar">
+        <div class="title">
+          <h1>Library Operations</h1>
+          <p>Issue/Return/Renew books • Overdue monitoring • Fine rule management</p>
+        </div>
+        <div class="pill" id="modePill">Mode: —</div>
+      </div>
+
+      <section class="grid">
+        <div class="card col-12">
+          <h2>Summary</h2>
+          <div class="kpi">
+            <div class="kv"><div class="k">Issued Today</div><div class="v" id="issuedToday">0</div></div>
+            <div class="kv"><div class="k">Total Issued (Active)</div><div class="v" id="totalIssued">0</div></div>
+            <div class="kv"><div class="k">Overdue</div><div class="v" id="overdueCount">0</div></div>
+            <div class="kv"><div class="k">Total Fine (BDT)</div><div class="v" id="totalFine">0</div></div>
+          </div>
+
+          <div class="row-actions">
+            <button class="btn" id="refreshBtn">Refresh</button>
+            <span class="muted" id="statusText"></span>
+          </div>
+        </div>
+
+        <!-- Issue book -->
+        <div class="card col-6" id="issue">
+          <h2>Issue Book</h2>
+          <div class="form-grid">
+            <div>
+              <label>Student ID</label>
+              <input id="issueStudentId" placeholder="e.g., 2203177" />
+            </div>
+            <div>
+              <label>Book ID / Accession</label>
+              <input id="issueBookId" placeholder="e.g., BK-101" />
+            </div>
+            <div>
+              <label>Due Date</label>
+              <input id="issueDueDate" type="date" />
+            </div>
+            <div>
+              <label>Note (optional)</label>
+              <input id="issueNote" placeholder="e.g., 7 days loan" />
+            </div>
+          </div>
+          <div class="row-actions">
+            <button class="btn primary" id="issueBtn">Issue</button>
+            <button class="btn" id="renewBtn">Renew (Demo)</button>
+          </div>
+          <p class="muted" style="margin:10px 0 0;">
+            Later backend API: <code>POST /api/library/issue</code>
+          </p>
+        </div>
+
+        <!-- Return book -->
+        <div class="card col-6" id="return">
+          <h2>Return Book</h2>
+          <div class="form-grid">
+            <div>
+              <label>Issue ID / Transaction ID</label>
+              <input id="returnIssueId" placeholder="e.g., ISS-5001" />
+            </div>
+            <div>
+              <label>Return Date</label>
+              <input id="returnDate" type="date" />
+            </div>
+          </div>
+          <div class="row-actions">
+            <button class="btn primary" id="returnBtn">Return</button>
+          </div>
+          <p class="muted" style="margin:10px 0 0;">
+            Later backend API: <code>POST /api/library/return</code>
+          </p>
+        </div>
+
+        <!-- Overdue list -->
+        <div class="card col-8" id="overdue">
+          <h2>Overdue List</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Student</th>
+                <th>Book</th>
+                <th>Due Date</th>
+                <th>Days Late</th>
+                <th>Fine (BDT)</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="overdueBody">
+              <tr><td colspan="6" class="muted">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Fine rule settings -->
+        <div class="card col-4" id="settings">
+          <h2>Fine Rules</h2>
+          <label>Fine per day (BDT)</label>
+          <input id="finePerDay" type="number" min="0" step="1" placeholder="e.g., 5" />
+
+          <label>Grace days (optional)</label>
+          <input id="graceDays" type="number" min="0" step="1" placeholder="e.g., 0" />
+
+          <div class="row-actions">
+            <button class="btn primary" id="saveFineBtn">Save Rule</button>
+          </div>
+
+          <p class="muted" style="margin-top:10px;">
+            Later backend API: <code>PUT /api/library/fine-rule</code>
+          </p>
+        </div>
+
+        <!-- Recent transactions -->
+        <div class="card col-12">
+          <h2>Recent Transactions</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Issue ID</th>
+                <th>Student</th>
+                <th>Book</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="recentBody">
+              <tr><td colspan="5" class="muted">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    // ===== CONFIG =====
+    const API_BASE = "http://localhost:5000";
+
+    // ===== AUTH GUARD =====
+    const token = localStorage.getItem("token");
+    const role = (localStorage.getItem("role") || "").toLowerCase();
+
+    if (!token) window.location.href = "login.html";
+
+    // Only librarians allowed here
+    if (role && role !== "librarian") {
+      if (role === "student") window.location.href = "student.html";
+      else if (role === "hall_manager") window.location.href = "hall.html";
+      else if (role === "department_officer") window.location.href = "department.html";
+      else window.location.href = "login.html";
+    }
+
+    const $ = (id) => document.getElementById(id);
+    const statusText = $("statusText");
+
+    function setStatus(text){ statusText.textContent = text || ""; }
+    function money(n){ return (Number(n)||0).toFixed(0); }
+    function badge(status){
+      const s = (status || "").toLowerCase();
+      if (s === "issued") return `<span class="badge ok">ISSUED</span>`;
+      if (s === "overdue") return `<span class="badge warn">OVERDUE</span>`;
+      if (s === "returned") return `<span class="badge">RETURNED</span>`;
+      return `<span class="badge">${status || "—"}</span>`;
+    }
+
+    // ===== DEMO DATA (works without backend) =====
+    const DEMO = {
+      fineRule: { finePerDay: 5, graceDays: 0 },
+      overdue: [
+        { studentId: "2203177", bookId: "BK-101", dueDate: "2026-01-25", daysLate: 13, fine: 65, status: "overdue" },
+        { studentId: "2203188", bookId: "BK-205", dueDate: "2026-02-01", daysLate: 6, fine: 30, status: "overdue" }
+      ],
+      recent: [
+        { date: "2026-02-07", issueId: "ISS-5001", studentId: "2203177", bookId: "BK-101", action: "Issued" },
+        { date: "2026-02-06", issueId: "ISS-4999", studentId: "2203188", bookId: "BK-205", action: "Issued" }
+      ]
+    };
+
+    function isBackendMode(){
+      // if you want, later detect by ping endpoint
+      return false;
+    }
+
+    function setModePill(){
+      $("modePill").textContent = isBackendMode() ? "Mode: Backend" : "Mode: Demo";
+    }
+
+    // ===== RENDER =====
+    function render(){
+      // Summary
+      $("issuedToday").textContent = "1"; // demo
+      $("totalIssued").textContent = String(DEMO.recent.length);
+      $("overdueCount").textContent = String(DEMO.overdue.length);
+      $("totalFine").textContent = money(DEMO.overdue.reduce((s,x)=>s+(Number(x.fine)||0),0));
+
+      // Overdue table
+      const overdueBody = $("overdueBody");
+      if (!DEMO.overdue.length){
+        overdueBody.innerHTML = `<tr><td colspan="6" class="muted">No overdue books.</td></tr>`;
+      } else {
+        overdueBody.innerHTML = DEMO.overdue.map(x => `
+          <tr>
+            <td>${x.studentId}</td>
+            <td>${x.bookId}</td>
+            <td>${x.dueDate}</td>
+            <td>${x.daysLate}</td>
+            <td>${money(x.fine)}</td>
+            <td>${badge(x.status)}</td>
+          </tr>
+        `).join("");
+      }
+
+      // Fine rule fields
+      $("finePerDay").value = DEMO.fineRule.finePerDay;
+      $("graceDays").value = DEMO.fineRule.graceDays;
+
+      // Recent transactions
+      const recentBody = $("recentBody");
+      if (!DEMO.recent.length){
+        recentBody.innerHTML = `<tr><td colspan="5" class="muted">No recent activity.</td></tr>`;
+      } else {
+        recentBody.innerHTML = DEMO.recent.map(r => `
+          <tr>
+            <td>${r.date}</td>
+            <td>${r.issueId}</td>
+            <td>${r.studentId}</td>
+            <td>${r.bookId}</td>
+            <td>${r.action}</td>
+          </tr>
+        `).join("");
+      }
+    }
+
+    // ===== ACTIONS (DEMO) =====
+    $("refreshBtn").addEventListener("click", () => {
+      setStatus("Refreshed.");
+      render();
+    });
+
+    $("issueBtn").addEventListener("click", () => {
+      const studentId = $("issueStudentId").value.trim();
+      const bookId = $("issueBookId").value.trim();
+      const dueDate = $("issueDueDate").value;
+
+      if (!studentId || !bookId || !dueDate) {
+        setStatus("Please provide Student ID, Book ID, and Due Date.");
+        return;
+      }
+
+      const issueId = "ISS-" + (5000 + DEMO.recent.length + 1);
+      DEMO.recent.unshift({
+        date: new Date().toISOString().slice(0,10),
+        issueId, studentId, bookId, action: "Issued"
+      });
+
+      // If due date is earlier than today => mark overdue (demo)
+      const today = new Date().toISOString().slice(0,10);
+      if (dueDate < today) {
+        const daysLate = Math.max(1, Math.floor((new Date(today) - new Date(dueDate)) / (1000*60*60*24)));
+        const fine = Math.max(0, (daysLate - DEMO.fineRule.graceDays)) * DEMO.fineRule.finePerDay;
+        DEMO.overdue.unshift({ studentId, bookId, dueDate, daysLate, fine, status: "overdue" });
+      }
+
+      setStatus(`Book issued successfully (Demo). Issue ID: ${issueId}`);
+      render();
+    });
+
+    $("renewBtn").addEventListener("click", () => {
+      setStatus("Renew action saved (Demo). (Later: connect backend)");
+    });
+
+    $("returnBtn").addEventListener("click", () => {
+      const issueId = $("returnIssueId").value.trim();
+      if (!issueId) { setStatus("Please provide Issue ID."); return; }
+
+      // demo: remove first overdue item if exists
+      if (DEMO.overdue.length) DEMO.overdue.shift();
+
+      DEMO.recent.unshift({
+        date: new Date().toISOString().slice(0,10),
+        issueId,
+        studentId: "—",
+        bookId: "—",
+        action: "Returned"
+      });
+
+      setStatus(`Book returned successfully (Demo). Issue ID: ${issueId}`);
+      render();
+    });
+
+    $("saveFineBtn").addEventListener("click", () => {
+      const finePerDay = Number($("finePerDay").value || 0);
+      const graceDays = Number($("graceDays").value || 0);
+      if (finePerDay < 0 || graceDays < 0) {
+        setStatus("Values cannot be negative.");
+        return;
+      }
+      DEMO.fineRule = { finePerDay, graceDays };
+      setStatus("Fine rule saved (Demo).");
+      render();
+    });
+
+    $("logoutBtn").addEventListener("click", () => {
+      localStorage.removeItem("token");
+      localStorage.removeItem("role");
+      window.location.href = "login.html";
+    });
+
+    setModePill();
+    render();
+    setStatus("Loaded.");
+  </script>
+</body>
+</html>
