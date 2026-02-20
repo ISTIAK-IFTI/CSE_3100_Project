@@ -144,22 +144,16 @@
     </div>
   </div>
 
-  <script>
-  // Change this when you deploy:
-  const API_BASE = "http://localhost:5000";
+<script>
+  // =========================
+  // CONFIG
+  // =========================
+  const API_BASE = "http://127.0.0.1:5000";
   document.getElementById("apiUrlText").textContent = API_BASE;
 
   const form = document.getElementById("loginForm");
   const btn = document.getElementById("btn");
   const message = document.getElementById("message");
-
-  // ===== DEMO USERS (Frontend-only) =====
-  const DEMO_USERS = {
-    "2203177": { password: "720", role: "student" },
-    "lib001":  { password: "123456", role: "librarian" },
-    "hall001": { password: "123456", role: "hall_manager" },
-    "dept001": { password: "123456", role: "department_officer" }
-  };
 
   function showMsg(text, type) {
     message.textContent = text;
@@ -168,13 +162,27 @@
 
   function redirectByRole(role) {
     const r = (role || "").toLowerCase();
-    if (r === "student") window.location.href = "student1.html";
-    else if (r === "hall_manager") window.location.href = "hall.html";
-    else if (r === "department_officer") window.location.href = "department.html";
-    else if (r === "librarian") window.location.href = "librarian.html";
-    else showMsg("Unknown role: " + role, "err");
+
+    if (r === "student1") {
+      window.location.href = "student1.html";
+    }
+    else if (r === "librarian") {
+      window.location.href = "librarian.html";
+    }
+    else if (r === "hall_manager") {
+      window.location.href = "hall.html";
+    }
+    else if (r === "department_officer") {
+      window.location.href = "department.html";
+    }
+    else {
+      showMsg("Unknown role received from server.", "err");
+    }
   }
 
+  // =========================
+  // LOGIN SUBMIT
+  // =========================
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     showMsg("", "ok");
@@ -182,46 +190,46 @@
     const identifier = document.getElementById("identifier").value.trim();
     const password = document.getElementById("password").value;
 
-    btn.disabled = true;
-    btn.textContent = "Logging in...";
-
-    // ===== 1) DEMO LOGIN (NO BACKEND NEEDED) =====
-    if (DEMO_USERS[identifier] && DEMO_USERS[identifier].password === password) {
-      localStorage.setItem("token", "demo-token");
-      localStorage.setItem("role", DEMO_USERS[identifier].role);
-
-      showMsg("Demo login successful. Redirecting...", "ok");
-      setTimeout(() => redirectByRole(DEMO_USERS[identifier].role), 300);
-
-      btn.disabled = false;
-      btn.textContent = "Login";
+    if (!identifier || !password) {
+      showMsg("Please enter email and password.", "err");
       return;
     }
 
-    // ===== 2) REAL BACKEND LOGIN =====
+    btn.disabled = true;
+    btn.textContent = "Logging in...";
+
     try {
       const res = await fetch(`${API_BASE}/api/auth/login`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ identifier, password })
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email: identifier,   // sending as email
+          password: password
+        })
       });
 
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        showMsg(data.message || "Login failed. Check credentials.", "err");
+        showMsg(data.message || "Login failed.", "err");
         return;
       }
 
-      // Expected: { token: "...", role: "student" }
+      // Save session data
       localStorage.setItem("token", data.token);
       localStorage.setItem("role", data.role);
+      localStorage.setItem("studentId", data.studentId);
 
       showMsg("Login successful. Redirecting...", "ok");
-      setTimeout(() => redirectByRole(data.role), 300);
+
+      setTimeout(() => {
+        redirectByRole(data.role);
+      }, 500);
 
     } catch (err) {
-      showMsg("Backend not reachable. Use demo IDs like 2203177/123456.", "err");
+      showMsg("Backend not reachable ❌", "err");
     } finally {
       btn.disabled = false;
       btn.textContent = "Login";
