@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OTP Verification</title>
+
+  <style>
+    :root{
+      --bg:#f3f4f6;
+      --card:#ffffff;
+      --text:#111827;
+      --muted:#6b7280;
+      --line:#e5e7eb;
+      --btn:#111827;
+      --btnText:#ffffff;
+      --danger:#b00020;
+      --ok:#0b7a2a;
+      --accent:#2563eb;
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family: Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .page{
+      max-width: 720px;
+      margin: 24px auto;
+      padding: 0 16px 40px;
+    }
+    .card{
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 18px;
+      box-shadow: 0 10px 24px rgba(0,0,0,.06);
+    }
+    .title{
+      margin:0 0 10px;
+      font-size: 22px;
+      border-bottom: 2px solid var(--line);
+      padding-bottom: 10px;
+    }
+    .sub{
+      color: var(--muted);
+      font-size: 13px;
+      margin: 8px 0 14px;
+    }
+    .otpRow{
+      display:flex;
+      gap: 10px;
+      justify-content:center;
+      margin: 12px 0 10px;
+      flex-wrap: wrap;
+    }
+    .otpRow input{
+      width: 48px;
+      height: 54px;
+      text-align:center;
+      font-size: 20px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      outline:none;
+      background:#fff;
+    }
+    .otpRow input:focus{ border-color:#9ca3af; }
+    .actions{
+      display:flex;
+      gap:10px;
+      justify-content:center;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
+    button{
+      border:none;
+      border-radius: 10px;
+      padding: 11px 14px;
+      cursor:pointer;
+      font-size: 14px;
+      min-width: 160px;
+    }
+    .btnPrimary{ background: var(--btn); color: var(--btnText); }
+    .btnGhost{ background:#ffffff; border:1px solid var(--line); color: var(--text); }
+    button:disabled{ opacity:.65; cursor:not-allowed; }
+    .msg{
+      margin-top: 12px;
+      font-size: 13px;
+      text-align:center;
+    }
+    .msg.ok{ color: var(--ok); }
+    .msg.err{ color: var(--danger); }
+    .api{
+      font-size: 12px;
+      color: var(--muted);
+      text-align:right;
+    }
+    .api code{ color: var(--accent); }
+
+    @media (max-width: 520px){
+      .otpRow input{ width: 42px; height: 52px; }
+      button{ width:100%; }
+      .api{ text-align:left; margin-top: 6px; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="page">
+    <div class="card">
+      <div class="api">API: <code id="apiText"></code></div>
+      <h1 class="title">Verification Page</h1>
+      <div class="sub" id="emailHint">Enter the 6-digit OTP sent to your email.</div>
+
+      <div class="otpRow" id="otpRow">
+        <input inputmode="numeric" maxlength="1" />
+        <input inputmode="numeric" maxlength="1" />
+        <input inputmode="numeric" maxlength="1" />
+        <input inputmode="numeric" maxlength="1" />
+        <input inputmode="numeric" maxlength="1" />
+        <input inputmode="numeric" maxlength="1" />
+      </div>
+
+      <div class="actions">
+        <button class="btnGhost" id="backBtn">Back</button>
+        <button class="btnPrimary" id="verifyBtn">Verify OTP</button>
+      </div>
+
+      <div class="actions" style="margin-top:10px;">
+        <button class="btnGhost" id="resendBtn">Resend OTP</button>
+      </div>
+
+      <div id="msg" class="msg"></div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = "http://127.0.0.1:5000";
+    document.getElementById("apiText").textContent = API_BASE || "(same origin)";
+
+    const msg = document.getElementById("msg");
+    const emailHint = document.getElementById("emailHint");
+    const inputs = Array.from(document.querySelectorAll("#otpRow input"));
+    const verifyBtn = document.getElementById("verifyBtn");
+    const resendBtn = document.getElementById("resendBtn");
+    const backBtn = document.getElementById("backBtn");
+
+    const pendingEmail = localStorage.getItem("pending_email");
+    const pendingStudentId = localStorage.getItem("pending_studentId");
+
+    if (!pendingEmail || !pendingStudentId) {
+      window.location.href = "/frontend/register.html";
+    }
+    if (pendingEmail){
+      emailHint.textContent = `Enter the 6-digit OTP sent to: ${pendingEmail}`;
+    } else {
+      emailHint.textContent = "No pending registration found. Please register first.";
+    }
+
+    function show(text, ok=true){
+      msg.textContent = text;
+      msg.className = "msg " + (ok ? "ok" : "err");
+    }
+
+    function getOtp(){
+      return inputs.map(i => i.value.trim()).join("");
+    }
+
+    // OTP UX: auto move & only digits
+    inputs.forEach((inp, idx) => {
+      inp.addEventListener("input", () => {
+        inp.value = inp.value.replace(/[^0-9]/g, "").slice(0,1);
+        if (inp.value && idx < inputs.length - 1) inputs[idx + 1].focus();
+      });
+
+      inp.addEventListener("keydown", (e) => {
+        if (e.key === "Backspace" && !inp.value && idx > 0){
+          inputs[idx - 1].focus();
+        }
+      });
+
+      inp.addEventListener("paste", (e) => {
+        e.preventDefault();
+        const text = (e.clipboardData || window.clipboardData).getData("text").replace(/[^0-9]/g,"").slice(0,6);
+        text.split("").forEach((ch, i) => { if (inputs[i]) inputs[i].value = ch; });
+        const last = Math.min(text.length, 6) - 1;
+        if (last >= 0) inputs[last].focus();
+      });
+    });
+
+    backBtn.addEventListener("click", () => {
+      window.location.href = "register.html";
+    });
+
+    verifyBtn.addEventListener("click", async () => {
+      show("");
+
+      if (!pendingEmail){
+        show("No pending email found. Please register first.", false);
+        return;
+      }
+
+      const otp = getOtp();
+      if (otp.length !== 6){
+        show("Please enter the 6-digit OTP.", false);
+        return;
+      }
+
+      verifyBtn.disabled = true;
+      verifyBtn.textContent = "Verifying...";
+
+      try {
+        const res = await fetch(`${API_BASE}/api/auth/verify-otp`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: pendingEmail, otp })
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok){
+          show(data.message || "OTP verification failed.", false);
+          return;
+        }
+
+        show("Verified successfully ✅ Redirecting to login...", true);
+
+        // Clear pending registration
+        localStorage.removeItem("pending_email");
+        localStorage.removeItem("pending_studentId");
+
+        setTimeout(() => {
+          window.location.href = "login.html";
+        }, 700);
+
+      } catch (err){
+        show("Backend not reachable. Make sure Flask is running.", false);
+      } finally {
+        verifyBtn.disabled = false;
+        verifyBtn.textContent = "Verify OTP";
+      }
+    });
+
+    resendBtn.addEventListener("click", async () => {
+      show("");
+
+      if (!pendingEmail){
+        show("No pending email found. Please register first.", false);
+        return;
+      }
+
+      resendBtn.disabled = true;
+      resendBtn.textContent = "Sending...";
+
+      try {
+        const res = await fetch(`${API_BASE}/api/auth/resend-otp`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: pendingEmail })
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok){
+          show(data.message || "Failed to resend OTP.", false);
+          return;
+        }
+
+        show("OTP resent ✅ Check your email.", true);
+
+      } catch (err){
+        show("Backend not reachable. Make sure Flask is running.", false);
+      } finally {
+        resendBtn.disabled = false;
+        resendBtn.textContent = "Resend OTP";
+      }
+    });
+
+    // focus first box
+    inputs[0].focus();
+  </script>
+</body>
+</html>

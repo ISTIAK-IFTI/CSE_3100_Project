@@ -11,7 +11,6 @@
         font-family: Arial, sans-serif;
         background: url("media/ruet_main_gate.jpg") center/cover no-repeat fixed;
     }
-
     /* dark overlay so text readable */
     .wrap{
         min-height:100vh;
@@ -21,7 +20,6 @@
         padding:20px;
         background: rgba(0,0,0,0.35);
     }
-
     /* login box background image */
     .card{
         width:100%;
@@ -34,7 +32,6 @@
         box-shadow: 0 10px 30px rgba(0,0,0,.18);
         opacity: 0.6;
     }
-
     /* optional: white overlay inside card so inputs readable */
     .card::before{
         content:"";
@@ -42,13 +39,11 @@
         inset:0;
         background: rgba(255,255,255,0.88);  /* adjust 0.75–0.95 */
     }
-
     /* keep card content above overlay */
     .card > *{
         position: relative;
         z-index: 1;
     }
-
     h1 { 
       margin: 0 0 8px;
       font-size: 20px;
@@ -88,6 +83,23 @@
       opacity: .6; 
       cursor: not-allowed; 
     }
+    .registerButton{
+      width: 100%;
+      margin-top: 12px;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid #ddd;
+      background: black;
+      cursor: pointer;
+      font-size: 14px;
+      transition: 0.2s;
+    }
+    .registerButton:hover{
+      background: red;
+    }
+    #btn:hover {
+      background: #73e859;  /* slightly lighter */
+    }
     .msg { 
       margin-top: 12px; 
       font-size: 13px; 
@@ -124,12 +136,14 @@
 
       <form id="loginForm">
         <label for="identifier">ID / Email</label>
-        <input id="identifier" name="identifier" placeholder="e.g., 2203177 or email" required />
+        <input id="identifier" name="identifier" placeholder="e.g. demo_id@ruet.ac.bd" required />
 
         <label for="password">Password</label>
         <input id="password" name="password" type="password" placeholder="Enter password" required />
 
         <button id="btn" type="submit">Login</button>
+        <button type="button" id="registerBtn" class="registerButton">Registration</button>
+
         <div id="message" class="msg"></div>
 
         <div class="row">
@@ -154,6 +168,9 @@
   const form = document.getElementById("loginForm");
   const btn = document.getElementById("btn");
   const message = document.getElementById("message");
+  document.getElementById("registerBtn").addEventListener("click", () => {
+  window.location.href = "register.html";
+  });
 
   function showMsg(text, type) {
     message.textContent = text;

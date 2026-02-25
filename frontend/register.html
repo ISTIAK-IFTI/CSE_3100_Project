@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Student Registration</title>
+
+  <style>
+    :root{
+      --bg:#f3f4f6;
+      --card:#ffffff;
+      --text:#111827;
+      --muted:#6b7280;
+      --line:#e5e7eb;
+      --btn:#111827;
+      --btnText:#ffffff;
+      --danger:#b00020;
+      --ok:#0b7a2a;
+      --accent:#2563eb;
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family: Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .page{
+      max-width: 920px;
+      margin: 24px auto;
+      padding: 0 16px 40px;
+    }
+    .card{
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 18px;
+      box-shadow: 0 10px 24px rgba(0,0,0,.06);
+    }
+    .title{
+      margin:0 0 12px;
+      font-size: 22px;
+      border-bottom: 2px solid var(--line);
+      padding-bottom: 10px;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    .field label{
+      display:block;
+      font-size: 13px;
+      color: var(--muted);
+      margin: 0 0 6px;
+    }
+    .field input{
+      width:100%;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      outline: none;
+      font-size: 14px;
+      background:#fff;
+    }
+    .field input:focus{ border-color:#9ca3af; }
+
+    .emailRow{
+      display:flex;
+      gap:10px;
+      align-items:center;
+    }
+    .emailSuffix{
+      white-space: nowrap;
+      font-size: 14px;
+      color: var(--muted);
+      border: 1px solid var(--line);
+      background:#f9fafb;
+      padding: 10px 12px;
+      border-radius: 10px;
+    }
+
+    .note{
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .rowFull{
+      grid-column: 1 / -1;
+    }
+
+    .actions{
+      display:flex;
+      gap:10px;
+      justify-content:flex-end;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
+    button{
+      border:none;
+      border-radius: 10px;
+      padding: 11px 14px;
+      cursor:pointer;
+      font-size: 14px;
+    }
+    .btnPrimary{
+      background: var(--btn);
+      color: var(--btnText);
+      min-width: 160px;
+    }
+    .btnGhost{
+      background:#ffffff;
+      border: 1px solid var(--line);
+      color: var(--text);
+    }
+    button:disabled{ opacity:.65; cursor:not-allowed; }
+
+    .msg{
+      margin-top: 10px;
+      font-size: 13px;
+    }
+    .msg.ok{ color: var(--ok); }
+    .msg.err{ color: var(--danger); }
+
+    .topBar{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      margin-bottom: 12px;
+    }
+    .api{
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .api code{ color: var(--accent); }
+
+    @media (max-width: 760px){
+      .grid{ grid-template-columns: 1fr; }
+      .actions{ justify-content:stretch; }
+      .btnPrimary{ width:100%; }
+      .btnGhost{ width:100%; }
+      .emailRow{ flex-direction: column; align-items: stretch; }
+      .emailSuffix{ text-align:center; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="page">
+    <div class="card">
+      <div class="topBar">
+        <h1 class="title">Student Registration Dashboard</h1>
+        <div class="api">API: <code id="apiText"></code></div>
+      </div>
+
+      <form id="regForm">
+        <div class="grid">
+          <div class="field">
+            <label for="studentId">Student ID (Roll)</label>
+            <input id="studentId" placeholder="e.g., 2203177" required />
+          </div>
+
+          <div class="field">
+            <label>Student Mail</label>
+            <div class="emailRow">
+              <input id="emailUser" placeholder="roll" required />
+              <div class="emailSuffix">@student.ruet.ac.bd</div>
+            </div>
+            <div class="note">Must be <b>&lt;roll&gt;@student.ruet.ac.bd</b></div>
+          </div>
+
+          <div class="field">
+            <label for="studentName">Student Name</label>
+            <input id="studentName" placeholder="Full name" required />
+          </div>
+
+          <div class="field">
+            <label for="password">Password</label>
+            <input id="password" type="password" placeholder="Create a password" required />
+          </div>
+
+          <div class="field">
+            <label for="password2">Retype Password</label>
+            <input id="password2" type="password" placeholder="Retype password" required />
+          </div>
+
+          <div class="field">
+            <label for="photo">Picture (JPG, ≤ 500KB)</label>
+            <input id="photo" type="file" accept=".jpg,.jpeg,image/jpeg" />
+            <div class="note">Optional for now. If selected: JPG only, max 500KB.</div>
+          </div>
+
+          <div class="rowFull">
+            <div id="msg" class="msg"></div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button type="button" class="btnGhost" id="toLoginBtn">Back to Login</button>
+          <button type="submit" class="btnPrimary" id="submitBtn">Register & Send OTP</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+<script>
+  const API_BASE = "http://127.0.0.1:5000";
+
+  const form = document.getElementById("regForm");
+  const msg = document.getElementById("msg");
+  const submitBtn = document.getElementById("submitBtn");
+
+  function show(text, ok = true) {
+    msg.textContent = text;
+    msg.className = "msg " + (ok ? "ok" : "err");
+  }
+
+  function onlyDigits(s) {
+    return /^[0-9]+$/.test(s);
+  }
+
+  toLoginBtn.addEventListener("click", () => {
+    window.location.href = "login.html";
+  });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    show("");
+
+    const roll = document.getElementById("studentId").value.trim();
+    const emailUser = document.getElementById("emailUser").value.trim();
+    const name = document.getElementById("studentName").value.trim();
+    const password = document.getElementById("password").value;
+    const password2 = document.getElementById("password2").value;
+    const photoFile = document.getElementById("photo")?.files?.[0];
+
+    if (!roll || !emailUser || !name || !password || !password2) {
+      show("Please fill in all required fields.", false);
+      return;
+    }
+    if (!onlyDigits(roll)) {
+      show("Student ID must be digits only.", false);
+      return;
+    }
+    if (emailUser !== roll) {
+      show("Email must be <roll>@student.ruet.ac.bd (prefix must match roll).", false);
+      return;
+    }
+    if (password !== password2) {
+      show("Passwords do not match.", false);
+      return;
+    }
+
+    const email = `${roll}@student.ruet.ac.bd`;
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Sending OTP...";
+
+    try {
+      const fd = new FormData();
+      fd.append("studentId", roll);
+      fd.append("email", email);
+      fd.append("name", name);
+      fd.append("password", password);
+      if (photoFile) fd.append("photo", photoFile);
+
+      const res = await fetch(`${API_BASE}/api/auth/register`, {
+        method: "POST",
+        body: fd
+      });
+
+      const raw = await res.text();
+      console.log("REGISTER status:", res.status);
+      console.log("REGISTER response:", raw);
+
+      let data = {};
+      try { data = JSON.parse(raw); } catch {}
+
+      if (!res.ok) {
+        show(data.message || `Registration failed (HTTP ${res.status})`, false);
+        return; // ✅ no redirect if server says fail
+      }
+
+      // Save info for verify page
+      localStorage.setItem("pending_email", email);
+      localStorage.setItem("pending_studentId", roll);
+
+      show("OTP sent ✅ Redirecting to verification...", true);
+
+      // ✅ ABSOLUTE redirect (most reliable)
+      const target = `${API_BASE}/frontend/verify.html`;
+      console.log("Redirecting to:", target);
+
+      setTimeout(() => {
+        window.location.href = target;
+      }, 200);
+
+    } catch (err) {
+      console.error(err);
+      show("Backend not reachable or JS error occurred.", false);
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Register & Send OTP";
+    }
+  });
+</script>
+
+
+</body>
+</html>
