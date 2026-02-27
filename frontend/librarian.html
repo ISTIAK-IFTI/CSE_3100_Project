@@ -101,7 +101,7 @@
     <main class="content">
       <div class="topbar">
         <div class="title">
-          <h1>Library Operations</h1>
+          <h1>Welcome <span id="librarianName">...</span></h1>
           <p>Issue/Return/Renew books • Overdue monitoring • Fine rule management</p>
         </div>
         <div class="pill" id="modePill">Mode: —</div>
@@ -230,17 +230,65 @@
             </tbody>
           </table>
         </div>
+
+        <!-- Add Book -->
+        <div class="card col-6" id="addBookSection">
+        <h2>Add New Book Into Library</h2>
+        <div class="form-grid">
+          <div>
+            <label>Book ID (Auto)</label>
+            <input id="bookId" readonly placeholder="Click Generate ID" />
+          </div>
+          <div>
+            <label>Book Title</label>
+            <input id="bookTitle" placeholder="e.g., Data Structures" />
+          </div>
+          <div>
+            <label>Author</label>
+            <input id="bookAuthor" placeholder="e.g., Mark Allen Weiss" />
+          </div>
+          <div>
+            <label>Category</label>
+            <input id="bookCategory" placeholder="e.g., CSE" />
+          </div>
+        </div>
+        <div class="row-actions">
+          <button class="btn primary" id="getBookId">Generate ID</button>
+          <button class="btn primary" id="addBookBtn">Add Book</button>
+        </div>
+        <p class="muted" style="margin:10px 0 0;">
+          Backend API: <code>POST /api/library/books</code>
+        </p>
+      </div>
+
+        <!-- Remove book -->
+        <div class="card col-6" id="return">
+          <h2>Remove Book</h2>
+          <div class="form-grid">
+            <div>
+              <label>Book ID</label>
+              <input id="removeBookId" placeholder="e.g., BK-101" />
+            </div>
+          </div>
+          <div class="row-actions">
+            <button class="btn primary" id="removeBtn">Remove</button>
+          </div>
+          <p class="muted" style="margin:10px 0 0;">
+            Later backend API: <code>POST /api/library/return</code>
+          </p>
+        </div>
       </section>
     </main>
   </div>
 
   <script>
     // ===== CONFIG =====
-    const API_BASE = "http://localhost:5000";
+    const API_BASE = "http://127.0.0.1:5000";
 
     // ===== AUTH GUARD =====
     const token = localStorage.getItem("token");
     const role = (localStorage.getItem("role") || "").toLowerCase();
+    const librarianName = localStorage.getItem("name") || "Librarian";
 
     if (!token) window.location.href = "login.html";
 
@@ -251,6 +299,8 @@
       else if (role === "department_officer") window.location.href = "department.html";
       else window.location.href = "login.html";
     }
+
+    document.getElementById("librarianName").textContent = librarianName;
 
     const $ = (id) => document.getElementById(id);
     const statusText = $("statusText");
@@ -332,6 +382,68 @@
         `).join("");
       }
     }
+    // ADD BOOK BUTTON 
+    document.getElementById("getBookId").addEventListener("click", async () => {
+      const res = await fetch(`${API_BASE}/api/library/next-book-id`);
+      const data = await res.json();
+      document.getElementById("bookId").value = data.bookId;
+    });
+    document.getElementById("addBookBtn").addEventListener("click", async () => {
+      const bookId = document.getElementById("bookId").value.trim();
+      const title = document.getElementById("bookTitle").value.trim();
+      const author = document.getElementById("bookAuthor").value.trim();
+      const category = document.getElementById("bookCategory").value.trim();
+      if (!bookId || !title || !author) {
+        alert("Please generate ID and fill Title + Author.");
+        return;
+      }
+      const res = await fetch(`${API_BASE}/api/library/books`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookId, title, author, category })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.message || "Failed to add book");
+        return;
+      }
+      alert(`Book added ✅ ID: ${data.bookId}`);
+    });
+
+    // GET BOOK ID 
+    document.getElementById("getBookId").addEventListener("click", async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/library/next-book-id`);
+        const data = await res.json();
+        document.getElementById("bookId").value = data.bookId;
+      } catch (err) {
+        alert("Failed to generate Book ID");
+      }
+    });
+
+    // REMOVE BOOK 
+    document.getElementById("removeBtn").addEventListener("click", async () => {
+      const bookId = document.getElementById("removeBookId").value.trim();
+      if (!bookId) {
+        alert("Please enter Book ID");
+        return;
+      }
+      try {
+        const res = await fetch(`${API_BASE}/api/library/books/${bookId}`, {
+          method: "DELETE"
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert(data.message || "Failed to remove book");
+          return;
+        }
+        alert("Book removed successfully ✅");
+        document.getElementById("removeBookId").value = "";
+      } catch (err) {
+        console.error(err);
+        alert("Backend not reachable ❌");
+      }
+    });
 
     // ===== ACTIONS (DEMO) =====
     $("refreshBtn").addEventListener("click", () => {

@@ -1,169 +1,3 @@
-# from flask import Flask, jsonify, send_from_directory, request
-# from flask_cors import CORS
-# import sqlite3
-# import bcrypt
-# from pathlib import Path
-
-# app = Flask(__name__)
-# CORS(app)
-
-# # =========================
-# # PATH CONFIG
-# # =========================
-# BASE_DIR = Path(__file__).resolve().parent.parent
-# DB_PATH = BASE_DIR / "database" / "ruet.db"
-# FRONTEND_DIR = BASE_DIR / "frontend"
-
-
-# # =========================
-# # DATABASE CONNECTION
-# # =========================
-# def get_db():
-#     con = sqlite3.connect(DB_PATH)
-#     con.row_factory = sqlite3.Row
-#     return con
-
-
-# # =========================
-# # SERVE FRONTEND
-# # =========================
-# @app.route("/frontend/<path:filename>")
-# def frontend_files(filename):
-#     return send_from_directory(FRONTEND_DIR, filename)
-
-
-# # =========================
-# # GET ONE STUDENT
-# # =========================
-# @app.route("/api/student/<student_id>")
-# def student(student_id):
-#     con = get_db()
-#     cur = con.cursor()
-
-#     cur.execute("""
-#         SELECT
-#             id AS studentId,
-#             name,
-#             dept,
-#             hall,
-#             room,
-#             email,
-#             hall_fee,
-#             library_fee,
-#             dept_fee
-#         FROM students
-#         WHERE id = ?
-#     """, (student_id,))
-
-#     row = cur.fetchone()
-#     con.close()
-
-#     if not row:
-#         return jsonify({"message": "Student not found"}), 404
-
-#     data = dict(row)
-
-#     hall_fee = int(data.get("hall_fee") or 0)
-#     library_fee = int(data.get("library_fee") or 0)
-#     dept_fee = int(data.get("dept_fee") or 0)
-
-#     total_due = hall_fee + library_fee + dept_fee
-
-#     data["due"] = {
-#         "total": total_due,
-#         "items": [
-#             {"title": "Hall Fee", "amount": hall_fee},
-#             {"title": "Library Fine", "amount": library_fee},
-#             {"title": "Department Fee", "amount": dept_fee}
-#         ]
-#     }
-
-#     return jsonify(data)
-
-
-# # =========================
-# # GET ALL STUDENTS (OPTIONAL)
-# # =========================
-# @app.route("/api/students")
-# def students():
-#     con = get_db()
-#     cur = con.cursor()
-
-#     cur.execute("""
-#         SELECT
-#             id AS studentId,
-#             name,
-#             dept,
-#             hall,
-#             room,
-#             email,
-#             hall_fee,
-#             library_fee,
-#             dept_fee
-#         FROM students
-#         ORDER BY id ASC
-#     """)
-
-#     rows = cur.fetchall()
-#     con.close()
-
-#     return jsonify([dict(r) for r in rows])
-
-
-# # =========================
-# # LOGIN API
-# # =========================
-# @app.route("/api/auth/login", methods=["POST"])
-# def login():
-#     data = request.json
-
-#     if not data:
-#         return jsonify({"message": "Invalid request"}), 400
-
-#     email = data.get("email")
-#     password = data.get("password")
-
-#     if not email or not password:
-#         return jsonify({"message": "Email and password required"}), 400
-
-#     con = get_db()
-#     cur = con.cursor()
-
-#     cur.execute("""
-#         SELECT id, password_hash
-#         FROM students
-#         WHERE LOWER(email) = LOWER(?)
-#     """, (email,))
-
-#     user = cur.fetchone()
-#     con.close()
-
-#     if not user:
-#         return jsonify({"message": "Email not found"}), 404
-
-#     stored_hash = user["password_hash"]
-
-#     # Verify password
-#     if not bcrypt.checkpw(password.encode("utf-8"), stored_hash.encode("utf-8")):
-#         return jsonify({"message": "Wrong password"}), 401
-
-#     # SUCCESS
-#     return jsonify({
-#         "message": "Login successful",
-#         "studentId": user["id"],
-#         "role": "student1",
-#         "token": "demo-token"  # Later replace with JWT
-#     }), 200
-
-
-# # =========================
-# # RUN SERVER
-# # =========================
-# if __name__ == "__main__":
-#     app.run(host="127.0.0.1", port=5000, debug=True)
-
-
-
 from flask import Flask, jsonify, send_from_directory, request
 from flask_cors import CORS
 import sqlite3
@@ -312,6 +146,25 @@ def register():
     if prefix != student_id:
         return jsonify({"message": "Email must be <roll>@student.ruet.ac.bd (prefix must match studentId)"}), 400
 
+    # Assign department 
+    allDept = {
+        '00':'CIVIL',
+        '01':'EEE',
+        '02':'ME',
+        '03':'CSE',
+        '04':'ETE',
+        '05':'IPE',
+        '06':'GCE',
+        '07':'URP',
+        '08':'MTE',
+        '09':'ARCH',
+        '10':'ECE',
+        '11':'CHE',
+        '12':'BECM',
+        '13':'MSE',
+    }
+    dept = student_id[2:4]
+
     # Hash password
     password_hash = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
@@ -354,9 +207,9 @@ def register():
     # Insert as unverified
     cur.execute("""
         INSERT INTO students
-          (id, name, email, password_hash, verified, otp_hash, otp_expires_at, otp_attempts_left)
-        VALUES (?, ?, ?, ?, 0, ?, ?, 5)
-    """, (student_id, name, email, password_hash, otp_hash, otp_expires_at))
+          (id, name, email, password_hash, verified, otp_hash, otp_expires_at, otp_attempts_left, dept)
+        VALUES (?, ?, ?, ?, 0, ?, ?, 5, ?)
+    """, (student_id, name, email, password_hash, otp_hash, otp_expires_at, dept))
 
     con.commit()
     con.close()
@@ -495,39 +348,148 @@ def resend_otp():
 @app.route("/api/auth/login", methods=["POST"])
 def login():
     data = request.json or {}
-    email = (data.get("email") or "").strip().lower()
+
+    identifier = (data.get("identifier") or data.get("email") or "").strip().lower()
     password = data.get("password") or ""
 
-    if not email or not password:
-        return jsonify({"message": "Email and password required"}), 400
+    if not identifier or not password:
+        return jsonify({"message": "Email/ID and password required"}), 400
+
+    email = identifier
 
     con = get_db()
     cur = con.cursor()
 
-    cur.execute("""
-        SELECT id, password_hash, verified
-        FROM students
-        WHERE LOWER(email)=LOWER(?)
-    """, (email,))
-    user = cur.fetchone()
+    user = None
+    role = None
+
+    # ✅ Student login (allow demo@gmail.com too)
+    if email.endswith("@student.ruet.ac.bd") or email == "demo@gmail.com":
+        cur.execute("""
+            SELECT id, name, password_hash, verified
+            FROM students
+            WHERE LOWER(email)=LOWER(?)
+        """, (email,))
+        user = cur.fetchone()
+        role = "student1"
+
+    # ✅ Librarian login
+    elif email.endswith("@library.ruet.ac.bd"):
+        cur.execute("""
+            SELECT email, name, password_hash
+            FROM librarians
+            WHERE LOWER(email)=LOWER(?)
+        """, (email,))
+        user = cur.fetchone()
+        role = "librarian"
+
     con.close()
 
     if not user:
         return jsonify({"message": "Email not found"}), 404
 
-    if int(user["verified"] or 0) != 1:
+    # ✅ If student, require verified
+    if role == "student1" and int(user["verified"] or 0) != 1:
         return jsonify({"message": "Please verify your email first."}), 403
 
     stored_hash = user["password_hash"] or ""
     if not bcrypt.checkpw(password.encode("utf-8"), stored_hash.encode("utf-8")):
         return jsonify({"message": "Wrong password"}), 401
 
-    # For now: demo token (later you can replace with JWT)
+    # ✅ Return fields
     return jsonify({
         "token": "demo-token",
-        "role": "student1",
-        "studentId": user["id"]
+        "role": role,
+        "studentId": user["id"] if role == "student1" else None,
+        "name": user["name"] if role == "librarian" else None
     }), 200
+
+
+# --------------------------------------
+#         GENERATE NEXT BOOK ID 
+# --------------------------------------
+@app.route("/api/library/next-book-id")
+def next_book_id():
+    con = get_db()
+    cur = con.cursor()
+
+    # Get last inserted book ID
+    cur.execute("""
+        SELECT id FROM books
+        ORDER BY id DESC
+        LIMIT 1
+    """)
+    row = cur.fetchone()
+    con.close()
+
+    if not row:
+        next_number = 1
+    else:
+        last_id = row["id"]   # e.g., BK-0007
+        last_number = int(last_id.split("-")[1])
+        next_number = last_number + 1
+
+    new_id = f"BK-{next_number:04d}"  # 4 digit format
+
+    return jsonify({"bookId": new_id})
+
+
+# -----------------------------
+#         ADD BOOK 
+# -----------------------------
+from datetime import datetime
+@app.route("/api/library/books", methods=["POST"])
+def add_book():
+    data = request.json or {}
+    title = (data.get("title") or "").strip()
+    author = (data.get("author") or "").strip()
+    category = (data.get("category") or "").strip()
+
+    if not title or not author:
+        return jsonify({"message": "Title and author are required"}), 400
+
+    con = get_db()
+    cur = con.cursor()
+
+    # Generate new ID safely
+    cur.execute("SELECT id FROM books ORDER BY id DESC LIMIT 1")
+    row = cur.fetchone()
+    next_no = 1 if not row else int(row["id"].split("-")[1]) + 1
+    new_id = f"BK-{next_no:04d}"
+
+    cur.execute("""
+        INSERT INTO books (id, title, author, category, status, added_at)
+        VALUES (?, ?, ?, ?, 'available', ?)
+    """, (new_id, title, author, category, datetime.utcnow().isoformat()))
+
+    con.commit()
+    con.close()
+
+    return jsonify({"message": "Book added", "bookId": new_id}), 200
+
+
+# -------------------------
+#       REMOVE BOOK
+# -------------------------
+@app.route("/api/library/books/<book_id>", methods=["DELETE"])
+def remove_book(book_id):
+    con = get_db()
+    cur = con.cursor()
+
+    # Check if book exists
+    cur.execute("SELECT id FROM books WHERE id = ?", (book_id,))
+    book = cur.fetchone()
+
+    if not book:
+        con.close()
+        return jsonify({"message": "Book ID not found"}), 404
+
+    # Delete book
+    cur.execute("DELETE FROM books WHERE id = ?", (book_id,))
+    con.commit()
+    con.close()
+
+    return jsonify({"message": "Book removed successfully"}), 200
 
 
 if __name__ == "__main__":

@@ -239,6 +239,8 @@
       localStorage.setItem("role", data.role);
       localStorage.setItem("studentId", data.studentId);
 
+      if (data.name) localStorage.setItem("name", data.name);   // ✅ IMPORTANT
+
       showMsg("Login successful. Redirecting...", "ok");
 
       setTimeout(() => {
