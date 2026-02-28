@@ -92,6 +92,8 @@
         <a href="#return">Return Book</a>
         <a href="#overdue">Overdue</a>
         <a href="#settings">Fine Rules</a>
+        <a href="#addBookSection">Add Book</a>
+        <a href="#removeBook">Remove Book</a>
       </nav>
 
       <div class="spacer"></div>
@@ -158,8 +160,8 @@
           <h2>Return Book</h2>
           <div class="form-grid">
             <div>
-              <label>Issue ID / Transaction ID</label>
-              <input id="returnIssueId" placeholder="e.g., ISS-5001" />
+              <label>Book Id </label>
+              <input id="returnBookId" placeholder="e.g., BK-0001" />
             </div>
             <div>
               <label>Return Date</label>
@@ -262,7 +264,7 @@
       </div>
 
         <!-- Remove book -->
-        <div class="card col-6" id="return">
+        <div class="card col-6" id="removeBook">
           <h2>Remove Book</h2>
           <div class="form-grid">
             <div>
@@ -382,6 +384,49 @@
         `).join("");
       }
     }
+    // ISSUE BOOK 
+    document.getElementById("issueBtn").addEventListener("click", async () => {
+      const studentId = document.getElementById("issueStudentId").value.trim();
+      const bookId = document.getElementById("issueBookId").value.trim();
+      const dueDate = document.getElementById("issueDueDate").value;
+
+      if (!studentId || !bookId || !dueDate) {
+        alert("Please fill up Student Id, Book Id and Due Date");
+        return;
+      }
+      const res = await fetch(`${API_BASE}/api/library/issueBook`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ studentId, bookId, dueDate })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(`🤦‍♂️ ${data.message} 🤦‍♂️`|| "Failed to issue book");
+        return;
+      }
+      alert(`✅ ${data.message} ✅`);
+    });
+    // RETURN BOOK 
+    document.getElementById("returnBtn").addEventListener("click", async () =>{
+      const bookId = document.getElementById("returnBookId").value.trim();
+      const returnDate = document.getElementById("returnDate").value;
+
+      if (!bookId || !returnDate) {
+        alert("Please fill up Book Id and Return Date")
+        return;
+      }
+      const res = await fetch(`${API_BASE}/api/library/returnBook`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({bookId, returnDate})
+      });
+      const data = await res.json();
+      if(!res.ok){
+        alert(`${data.message}` || "Failed to return book");
+        return;
+      }
+      alert(`${data.message}` || "Returned successfully");
+    });
     // ADD BOOK BUTTON 
     document.getElementById("getBookId").addEventListener("click", async () => {
       const res = await fetch(`${API_BASE}/api/library/next-book-id`);

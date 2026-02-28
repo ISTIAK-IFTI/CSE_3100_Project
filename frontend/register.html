@@ -212,6 +212,7 @@
   const form = document.getElementById("regForm");
   const msg = document.getElementById("msg");
   const submitBtn = document.getElementById("submitBtn");
+  const toLoginBtn = document.getElementById("toLoginBtn"); // important
 
   function show(text, ok = true) {
     msg.textContent = text;
@@ -222,9 +223,12 @@
     return /^[0-9]+$/.test(s);
   }
 
-  toLoginBtn.addEventListener("click", () => {
-    window.location.href = "login.html";
-  });
+  if (toLoginBtn) {
+    toLoginBtn.addEventListener("click", () => {
+      // window.location.href = "login.html";
+      window.location.href = "http://127.0.0.1:5500/frontend/login.html";
+    });
+  }
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -253,12 +257,16 @@
       show("Passwords do not match.", false);
       return;
     }
-
+    
     const email = `${roll}@student.ruet.ac.bd`;
-
+    
     submitBtn.disabled = true;
     submitBtn.textContent = "Sending OTP...";
-
+    
+    // ✅ Save for verify page (same origin)
+    localStorage.setItem("pending_email", email);
+    localStorage.setItem("pending_studentId", roll);
+    
     try {
       const fd = new FormData();
       fd.append("studentId", roll);
@@ -266,37 +274,29 @@
       fd.append("name", name);
       fd.append("password", password);
       if (photoFile) fd.append("photo", photoFile);
-
+      
+      console.log("✅ Submit handler running");
+      console.log("Origin:", window.location.origin);
+      
       const res = await fetch(`${API_BASE}/api/auth/register`, {
         method: "POST",
         body: fd
       });
+      window.location.href = "verify.html";
 
+      const data = await res.json().catch(() => ({}));
       const raw = await res.text();
-      console.log("REGISTER status:", res.status);
-      console.log("REGISTER response:", raw);
-
-      let data = {};
-      try { data = JSON.parse(raw); } catch {}
 
       if (!res.ok) {
         show(data.message || `Registration failed (HTTP ${res.status})`, false);
-        return; // ✅ no redirect if server says fail
+        return;
       }
 
-      // Save info for verify page
-      localStorage.setItem("pending_email", email);
-      localStorage.setItem("pending_studentId", roll);
+      // // ✅ Save for verify page (same origin)
+      // localStorage.setItem("pending_email", email);
+      // localStorage.setItem("pending_studentId", roll);
 
-      show("OTP sent ✅ Redirecting to verification...", true);
-
-      // ✅ ABSOLUTE redirect (most reliable)
-      const target = `${API_BASE}/frontend/verify.html`;
-      console.log("Redirecting to:", target);
-
-      setTimeout(() => {
-        window.location.href = target;
-      }, 200);
+      window.location.href = "verify.html";
 
     } catch (err) {
       console.error(err);
@@ -307,7 +307,6 @@
     }
   });
 </script>
-
 
 </body>
 </html>

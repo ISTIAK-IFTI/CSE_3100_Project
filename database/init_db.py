@@ -27,9 +27,10 @@
 
 # # cur.execute("""
 # # alter table books 
-# # add column added_at TEXT
+# # add column issue_duration TEXT
 # # """,())
 
+# # cur.execute("update students set verified = 1 where id = 2203177")
 
 # con.commit()
 # con.close()
@@ -63,7 +64,7 @@ con = sqlite3.connect(db_path)
 con.row_factory = sqlite3.Row
 cur = con.cursor()
 
-table_name = "books"
+table_name = "students"
 cur.execute(f"SELECT * FROM {table_name}")
 rows = cur.fetchall()
 

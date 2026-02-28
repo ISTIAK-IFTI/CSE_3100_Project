@@ -163,7 +163,7 @@ def register():
         '12':'BECM',
         '13':'MSE',
     }
-    dept = student_id[2:4]
+    dept = allDept[student_id[2:4]]
 
     # Hash password
     password_hash = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
@@ -434,6 +434,81 @@ def next_book_id():
     return jsonify({"bookId": new_id})
 
 
+# -------------------------
+#       ISSUE BOOK API
+# -------------------------
+@app.route("/api/library/issueBook", methods=["POST"])
+def issue_book():
+    data = request.json or {}
+    studentId = (data.get("studentId") or "").strip()
+    bookId = (data.get("bookId") or "").strip()
+    dueDate = (data.get("dueDate") or "").strip()
+    if not studentId or not bookId or not dueDate:
+        return jsonify({"message": "Missing data"}), 400
+    con = get_db()
+    cur = con.cursor()
+    try:
+        cur.execute("SELECT status FROM books WHERE id = ?", (bookId,))
+        row = cur.fetchone()
+        if not row:
+            return jsonify({"message": "Book not found"}), 404
+        if row["status"] != "available":
+            return jsonify({"message": f"Book already issued to {studentId}"}), 400
+        cur.execute("UPDATE books SET status = ? WHERE id = ?", (f"{studentId}", bookId))
+        cur.execute("UPDATE books SET issue_duration = ? WHERE id = ?", (f"{dueDate}", bookId))
+        con.commit()
+        return jsonify({"message": "Book issued successfully"})
+    except Exception as e:
+        return jsonify({"message": str(e)}), 500
+    finally:
+        con.close()
+
+
+# ---------------------------
+#       RETURN BOOK API
+# ---------------------------
+@app.route("/api/library/returnBook", methods=["POST"])
+def return_book():
+    data = request.json or {}
+    bookId = (data.get("bookId") or "").strip()
+    returnDate = (data.get("returnDate") or "")
+
+    if not bookId or not returnDate: 
+        return jsonify({"message": "Missing data"}), 400
+    con = get_db()
+    cur = con.cursor()
+    try:
+        cur.execute("select status, issue_duration from books where id = ?",(bookId,))
+        row = cur.fetchone()
+        status = row["status"]
+        if not row: 
+            return jsonify({"message": "Book not found"}), 404
+        if row["status"] == 'available':
+            return jsonify({"message": "Book is already available"}), 400
+        due_date = datetime.strptime(row["issue_duration"], "%Y-%m-%d")
+        ret_date = datetime.strptime(returnDate, "%Y-%m-%d")
+        late_days = (ret_date - due_date).days
+        fine = 0
+        if late_days > 0:
+            PER_DAY_FINE = 2
+            fine = late_days * PER_DAY_FINE
+            cur.execute("select library_fee from students where id = ?",(status,))
+            row = cur.fetchone()
+            libFee = None
+            if not row["library_fee"]:
+                libFee = fine
+            else:
+                libFee = row["library_fee"] + fine
+            cur.execute(f"update students set library_fee = {libFee} where id = '{status}'")
+        cur.execute("update books set status = 'available', issue_duration = NULL where id = ?",(bookId,))
+        con.commit()
+        return jsonify({"message": f"Book returned successfully. Fine: {fine}"})
+    except Exception as e:
+        return jsonify({"message": str(e)}), 500
+    finally:
+        con.close()
+
+
 # -----------------------------
 #         ADD BOOK 
 # -----------------------------
@@ -493,4 +568,5 @@ def remove_book(book_id):
 
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5000, debug=True)
+    app.run(host="127.0.0.1", port=5000,debug=True)
+    

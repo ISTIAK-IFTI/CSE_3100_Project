@@ -150,7 +150,7 @@
     const pendingStudentId = localStorage.getItem("pending_studentId");
 
     if (!pendingEmail || !pendingStudentId) {
-      window.location.href = "/frontend/register.html";
+      window.location.href = "register.html";
     }
     if (pendingEmail){
       emailHint.textContent = `Enter the 6-digit OTP sent to: ${pendingEmail}`;
