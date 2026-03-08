@@ -206,7 +206,7 @@
     </div>
   </div>
 
-<script>
+<!-- <script>
   const API_BASE = "http://127.0.0.1:5000";
 
   const form = document.getElementById("regForm");
@@ -223,12 +223,9 @@
     return /^[0-9]+$/.test(s);
   }
 
-  if (toLoginBtn) {
-    toLoginBtn.addEventListener("click", () => {
-      // window.location.href = "login.html";
-      window.location.href = "http://127.0.0.1:5500/frontend/login.html";
-    });
-  }
+  toLoginBtn.addEventListener("click", () => {
+    window.location.href = "login.html";
+  });
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -297,6 +294,108 @@
       // localStorage.setItem("pending_studentId", roll);
 
       window.location.href = "verify.html";
+
+    } catch (err) {
+      console.error(err);
+      show("Backend not reachable or JS error occurred.", false);
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Register & Send OTP";
+    }
+  });
+</script> -->
+
+<script>
+  const API_BASE = "http://127.0.0.1:5000";
+
+  const form = document.getElementById("regForm");
+  const msg = document.getElementById("msg");
+  const submitBtn = document.getElementById("submitBtn");
+
+  function show(text, ok = true) {
+    msg.textContent = text;
+    msg.className = "msg " + (ok ? "ok" : "err");
+  }
+
+  function onlyDigits(s) {
+    return /^[0-9]+$/.test(s);
+  }
+
+  toLoginBtn.addEventListener("click", () => {
+    window.location.href = "login.html";
+  });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    show("");
+
+    const roll = document.getElementById("studentId").value.trim();
+    const emailUser = document.getElementById("emailUser").value.trim();
+    const name = document.getElementById("studentName").value.trim();
+    const password = document.getElementById("password").value;
+    const password2 = document.getElementById("password2").value;
+    const photoFile = document.getElementById("photo")?.files?.[0];
+
+    if (!roll || !emailUser || !name || !password || !password2) {
+      show("Please fill in all required fields.", false);
+      return;
+    }
+    if (!onlyDigits(roll)) {
+      show("Student ID must be digits only.", false);
+      return;
+    }
+    if (emailUser !== roll) {
+      show("Email must be <roll>@student.ruet.ac.bd (prefix must match roll).", false);
+      return;
+    }
+    if (password !== password2) {
+      show("Passwords do not match.", false);
+      return;
+    }
+
+    const email = `${roll}@student.ruet.ac.bd`;
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Sending OTP...";
+
+    try {
+      const fd = new FormData();
+      fd.append("studentId", roll);
+      fd.append("email", email);
+      fd.append("name", name);
+      fd.append("password", password);
+      if (photoFile) fd.append("photo", photoFile);
+
+      const res = await fetch(`${API_BASE}/api/auth/register`, {
+        method: "POST",
+        body: fd
+      });
+
+      const raw = await res.text();
+      console.log("REGISTER status:", res.status);
+      console.log("REGISTER response:", raw);
+
+      let data = {};
+      try { data = JSON.parse(raw); } catch {}
+
+      if (!res.ok) {
+        show(data.message || `Registration failed (HTTP ${res.status})`, false);
+        return; // ✅ no redirect if server says fail
+      }
+
+      // Save info for verify page
+      localStorage.setItem("pending_email", email);
+      localStorage.setItem("pending_studentId", roll);
+
+      show("OTP sent ✅ Redirecting to verification...", true);
+
+      // ✅ ABSOLUTE redirect (most reliable)
+      const target = `${API_BASE}/frontend/verify.html`;
+      console.log("Redirecting to:", target);
+
+      setTimeout(() => {
+        window.location.href = target;
+      }, 200);
 
     } catch (err) {
       console.error(err);

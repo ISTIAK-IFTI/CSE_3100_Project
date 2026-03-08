@@ -382,6 +382,14 @@ def login():
         """, (email,))
         user = cur.fetchone()
         role = "librarian"
+    elif email.endswith("@hall.ruet.ac.bd"):
+        cur.execute("""
+            SELECT email, hall_name, password_hash
+            FROM halls
+            WHERE LOWER(email) = LOWER(?)
+        """, (email,))
+        user = cur.fetchone()
+        role = "hall_manager"
 
     con.close()
 
@@ -401,8 +409,41 @@ def login():
         "token": "demo-token",
         "role": role,
         "studentId": user["id"] if role == "student1" else None,
-        "name": user["name"] if role == "librarian" else None
+        "name": user["name"] if role == "librarian" else None,
+        "hall_name": user["hall_name"] if role == "hall_manager" else None,
     }), 200
+
+
+#  ---------------------------------------
+#          LIBRARY SUMMARY RENDR API
+#  ---------------------------------------
+@app.route("/api/library/render")
+def render():
+    con = get_db()
+    cur = con.cursor()
+    cur.execute("SELECT SUM(COALESCE(library_fee, 0)) AS total_fine FROM students")
+    row = cur.fetchone()
+    total_fine = row["total_fine"]
+    cur.execute("SELECT COUNT(*) FROM books WHERE status is not 'available'")
+    row = cur.fetchone()
+    total_issued = row[0]
+    cur.execute("SELECT COUNT(*) FROM books WHERE issue_duration < DATE('now')")
+    row = cur.fetchone()
+    overdue = row[0]
+    cur.execute("SELECT COUNT(*) FROM books WHERE issue_date = DATE('now')")
+    row = cur.fetchone()
+    issue_today = row[0]
+    cur.execute("SELECT status, id, issue_duration from books where issue_duration < date('now') and status != 'available'")
+    rows = cur.fetchall()
+    overdue_list = [dict(r) for r in rows]
+    con.close()
+    return jsonify({
+        "total_fine": total_fine or 0,
+        "total_issued": total_issued or 0,
+        "overdue": overdue or 0,
+        "issue_today": issue_today or 0,
+        "overdue_list": overdue_list
+    })
 
 
 # --------------------------------------
@@ -456,6 +497,7 @@ def issue_book():
             return jsonify({"message": f"Book already issued to {studentId}"}), 400
         cur.execute("UPDATE books SET status = ? WHERE id = ?", (f"{studentId}", bookId))
         cur.execute("UPDATE books SET issue_duration = ? WHERE id = ?", (f"{dueDate}", bookId))
+        cur.execute("update books set issue_date = DATE('now') where id = ?",(bookId,))
         con.commit()
         return jsonify({"message": "Book issued successfully"})
     except Exception as e:
@@ -500,7 +542,7 @@ def return_book():
             else:
                 libFee = row["library_fee"] + fine
             cur.execute(f"update students set library_fee = {libFee} where id = '{status}'")
-        cur.execute("update books set status = 'available', issue_duration = NULL where id = ?",(bookId,))
+        cur.execute("update books set status = 'available', issue_duration = NULL, issue_date = NULL where id = ?",(bookId,))
         con.commit()
         return jsonify({"message": f"Book returned successfully. Fine: {fine}"})
     except Exception as e:
