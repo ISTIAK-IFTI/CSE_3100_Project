@@ -146,12 +146,23 @@
     const resendBtn = document.getElementById("resendBtn");
     const backBtn = document.getElementById("backBtn");
 
+    // ✅ UNCOMMENTED - Get pending data from localStorage
     const pendingEmail = localStorage.getItem("pending_email");
     const pendingStudentId = localStorage.getItem("pending_studentId");
 
+    console.log("✅ Verify page loaded");
+    console.log("pending_email:", pendingEmail);
+    console.log("pending_studentId:", pendingStudentId);
+
+    // Auto redirect if no pending registration
     if (!pendingEmail || !pendingStudentId) {
-      window.location.href = "/frontend/register.html";
+      console.warn("❌ No pending registration found");
+      show("No pending email found. Please register first.", false);
+      // Commented out redirect - user can manually go back
+      // window.location.href = "register.html";
     }
+
+    // Update hint with email if available
     if (pendingEmail){
       emailHint.textContent = `Enter the 6-digit OTP sent to: ${pendingEmail}`;
     } else {

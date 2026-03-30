@@ -124,6 +124,109 @@ def student(student_id):
 
 
 # -------------------------
+# STUDENT: Get current student profile
+# -------------------------
+@app.route("/api/student/me")
+def student_me():
+    """Get profile of currently logged-in student (requires studentId in query or sessionStorage)"""
+    # Get from query parameter (sent from frontend)
+    student_id = request.args.get("id") or request.headers.get("X-Student-Id")
+    
+    if not student_id:
+        return jsonify({"message": "Student ID not provided. Use ?id=<studentId> or pass X-Student-Id header"}), 400
+    
+    con = get_db()
+    cur = con.cursor()
+
+    cur.execute("""
+        SELECT
+            id AS studentId,
+            name,
+            dept,
+            hall,
+            room,
+            email,
+            hall_fee,
+            library_fee,
+            dept_fee
+        FROM students
+        WHERE id = ?
+    """, (student_id,))
+
+    row = cur.fetchone()
+    con.close()
+
+    if not row:
+        return jsonify({"message": "Student not found"}), 404
+
+    data = dict(row)
+
+    hall_fee = int(data.get("hall_fee") or 0)
+    library_fee = int(data.get("library_fee") or 0)
+    dept_fee = int(data.get("dept_fee") or 0)
+
+    total_due = hall_fee + library_fee + dept_fee
+    data["due"] = {
+        "total": total_due,
+        "items": [
+            {"title": "Hall Fee", "amount": hall_fee},
+            {"title": "Library Fine", "amount": library_fee},
+            {"title": "Department Fee", "amount": dept_fee},
+        ]
+    }
+
+    return jsonify(data)
+
+
+# -------------------------
+# STUDENT: Get Student Dues
+# -------------------------
+@app.route("/api/student/dues")
+def student_dues():
+    """Get dues for currently logged-in student"""
+    student_id = request.args.get("id") or request.headers.get("X-Student-Id")
+    
+    if not student_id:
+        return jsonify({"message": "Student ID not provided"}), 400
+    
+    con = get_db()
+    cur = con.cursor()
+    
+    cur.execute("SELECT hall_fee, library_fee, dept_fee FROM students WHERE id=?", (student_id,))
+    row = cur.fetchone()
+    con.close()
+    
+    if not row:
+        return jsonify({"message": "Student not found"}), 404
+    
+    items = [
+        {"feeType": "Hall Fee", "period": "Monthly", "amount": int(row["hall_fee"] or 0), "status": "unpaid" if row["hall_fee"] else "paid"},
+        {"feeType": "Library Fine", "period": "Current", "amount": int(row["library_fee"] or 0), "status": "unpaid" if row["library_fee"] else "paid"},
+        {"feeType": "Department Fee", "period": "Semester", "amount": int(row["dept_fee"] or 0), "status": "unpaid" if row["dept_fee"] else "paid"},
+    ]
+    
+    return jsonify({"items": items}), 200
+
+
+# -------------------------
+# STUDENT: Get Payment History
+# -------------------------
+@app.route("/api/student/payments")
+def student_payments():
+    """Get payment history for currently logged-in student"""
+    student_id = request.args.get("id") or request.headers.get("X-Student-Id")
+    
+    if not student_id:
+        return jsonify({"message": "Student ID not provided"}), 400
+    
+    # For now, return empty payments (no payment table in DB yet)
+    # In future, query from payments table
+    items = []
+    
+    return jsonify({"items": items}), 200
+
+
+# -------------------------
 # AUTH: Register (send OTP)
 # -------------------------
 @app.route("/api/auth/register", methods=["POST"])
@@ -371,7 +474,7 @@ def login():
             WHERE LOWER(email)=LOWER(?)
         """, (email,))
         user = cur.fetchone()
-        role = "student1"
+        role = "student"
 
     # ✅ Librarian login
     elif email.endswith("@library.ruet.ac.bd"):
@@ -397,7 +500,7 @@ def login():
         return jsonify({"message": "Email not found"}), 404
 
     # ✅ If student, require verified
-    if role == "student1" and int(user["verified"] or 0) != 1:
+    if role == "student" and int(user["verified"] or 0) != 1:
         return jsonify({"message": "Please verify your email first."}), 403
 
     stored_hash = user["password_hash"] or ""
@@ -408,7 +511,7 @@ def login():
     return jsonify({
         "token": "demo-token",
         "role": role,
-        "studentId": user["id"] if role == "student1" else None,
+        "studentId": user["id"] if role == "student" else None,
         "name": user["name"] if role == "librarian" else None,
         "hall_name": user["hall_name"] if role == "hall_manager" else None,
     }), 200
@@ -607,6 +710,475 @@ def remove_book(book_id):
     con.close()
 
     return jsonify({"message": "Book removed successfully"}), 200
+
+
+# =========================================
+#        HALL MANAGEMENT APIs
+# =========================================
+
+# -------------------------
+# HALL AUTH: Get hall from email
+# -------------------------
+def get_hall_by_email(email: str):
+    """Get hall_id and hall_name from email."""
+    con = get_db()
+    cur = con.cursor()
+    cur.execute("SELECT id, hall_name FROM halls WHERE LOWER(email)=LOWER(?)", (email,))
+    hall = cur.fetchone()
+    con.close()
+    return dict(hall) if hall else None
+
+
+# -------------------------
+# HALL: Dashboard Summary
+# -------------------------
+@app.route("/api/hall/render")
+def hall_render():
+    # Get hall from token/email (in real app, verify JWT)
+    # For now, get hall_name from query parameter
+    con = get_db()
+    cur = con.cursor()
+    
+    # Get hall by name (or fallback to first hall if not provided)
+    hall_name = (request.args.get("hall_name") or "").strip()
+    
+    if hall_name:
+        cur.execute("SELECT id FROM halls WHERE hall_name = ?", (hall_name,))
+    else:
+        cur.execute("SELECT id FROM halls LIMIT 1")
+    
+    hall_row = cur.fetchone()
+    
+    if not hall_row:
+        con.close()
+        return jsonify({"message": "No hall found"}), 404
+    
+    hall_id = hall_row["id"]
+    
+    # Total rooms
+    cur.execute("SELECT COUNT(*) as count FROM rooms WHERE hall_id=?", (hall_id,))
+    total_rooms = cur.fetchone()["count"]
+    
+    # Allocated seats
+    cur.execute("SELECT COUNT(*) as count FROM room_allocations WHERE hall_id=?", (hall_id,))
+    allocated_seats = cur.fetchone()["count"]
+    
+    # Unpaid dues
+    cur.execute("SELECT COUNT(*) as count FROM hall_dues WHERE hall_id=? AND status='unpaid'", (hall_id,))
+    unpaid_count = cur.fetchone()["count"]
+    
+    # Monthly fee (latest)
+    cur.execute("SELECT amount FROM hall_monthly_fees WHERE hall_id=? ORDER BY month DESC LIMIT 1", (hall_id,))
+    fee_row = cur.fetchone()
+    monthly_fee = fee_row["amount"] if fee_row else 0
+    
+    con.close()
+    
+    return jsonify({
+        "totalRooms": total_rooms,
+        "allocatedSeats": allocated_seats,
+        "unpaidCount": unpaid_count,
+        "monthlyFee": monthly_fee
+    }), 200
+
+
+# -------------------------
+# HALL: Allocate Student to Room
+# -------------------------
+@app.route("/api/hall/allocate", methods=["POST"])
+def allocate_student():
+    data = request.json or {}
+    student_ids = data.get("studentIds") or []  # List of student IDs
+    room_number = (data.get("roomNumber") or "").strip()
+    alloc_type = (data.get("allocType") or "single").strip()
+    hall_name = (data.get("hallName") or "").strip()  # ✅ Get hall from request
+    
+    if not student_ids or not room_number or not hall_name:
+        return jsonify({"message": "studentIds, roomNumber, and hallName required"}), 400
+    
+    # Validate count
+    if alloc_type == "single" and len(student_ids) != 1:
+        return jsonify({"message": "Single allocation requires 1 student"}), 400
+    if alloc_type == "shared4" and len(student_ids) != 4:
+        return jsonify({"message": "Shared (4) allocation requires 4 students"}), 400
+    
+    con = get_db()
+    cur = con.cursor()
+    
+    try:
+        # Get hall by name (not just LIMIT 1!)
+        cur.execute("SELECT id FROM halls WHERE hall_name = ?", (hall_name,))
+        hall_row = cur.fetchone()
+        if not hall_row:
+            con.close()
+            return jsonify({"message": f"Hall '{hall_name}' not found"}), 404
+        
+        hall_id = hall_row["id"]
+        
+        # Check if room exists for this hall
+        cur.execute("SELECT id FROM rooms WHERE hall_id=? AND room_number=?", (hall_id, room_number))
+        room_row = cur.fetchone()
+        
+        if not room_row:
+            # Create room if doesn't exist
+            capacity = 1 if alloc_type == "single" else 4
+            cur.execute("""
+                INSERT INTO rooms (hall_id, room_number, capacity, occupied_seats)
+                VALUES (?, ?, ?, 0)
+            """, (hall_id, room_number, capacity))
+            con.commit()
+            cur.execute("SELECT id FROM rooms WHERE hall_id=? AND room_number=?", (hall_id, room_number))
+            room_row = cur.fetchone()
+        
+        room_id = room_row["id"]
+        
+        # Check room capacity
+        cur.execute("SELECT occupied_seats, capacity FROM rooms WHERE id=?", (room_id,))
+        room_info = cur.fetchone()
+        if room_info["occupied_seats"] + len(student_ids) > room_info["capacity"]:
+            con.close()
+            return jsonify({"message": "Room capacity exceeded"}), 400
+        
+        # Check if students already allocated
+        placeholders = ",".join("?" * len(student_ids))
+        cur.execute(f"SELECT COUNT(*) as count FROM room_allocations WHERE student_id IN ({placeholders})", student_ids)
+        if cur.fetchone()["count"] > 0:
+            con.close()
+            return jsonify({"message": "One or more students already allocated"}), 400
+        
+        # Verify students exist and are verified
+        cur.execute(f"SELECT COUNT(*) as count FROM students WHERE id IN ({placeholders}) AND verified=1", student_ids)
+        if cur.fetchone()["count"] != len(student_ids):
+            con.close()
+            return jsonify({"message": "One or more students not found or not verified"}), 400
+        
+        # Get hall name for updating student hall field
+        cur.execute("SELECT hall_name FROM halls WHERE id=?", (hall_id,))
+        hall_info = cur.fetchone()
+        hall_name = hall_info["hall_name"] if hall_info else "Unknown Hall"
+        
+        # Insert allocations and update student hall/room
+        allocation_date = now_iso()
+        for sid in student_ids:
+            cur.execute("""
+                INSERT INTO room_allocations (hall_id, room_id, student_id, allocation_date, allocation_type)
+                VALUES (?, ?, ?, ?, ?)
+            """, (hall_id, room_id, sid, allocation_date, alloc_type))
+            
+            # ✅ Update student's hall and room fields
+            cur.execute("""
+                UPDATE students SET hall=?, room=? WHERE id=?
+            """, (hall_name, room_number, sid))
+        
+        # Update room occupied seats
+        cur.execute("UPDATE rooms SET occupied_seats = occupied_seats + ? WHERE id=?", (len(student_ids), room_id))
+        
+        con.commit()
+        con.close()
+        
+        return jsonify({"message": f"Allocated {len(student_ids)} student(s) to room {room_number}"}), 200
+    
+    except Exception as e:
+        con.close()
+        return jsonify({"message": str(e)}), 500
+
+
+# -------------------------
+# DEBUG: Check hall allocation status
+# -------------------------
+@app.route("/api/debug/hall-status")
+def debug_hall_status():
+    """Debug endpoint to check allocations for all halls"""
+    con = get_db()
+    cur = con.cursor()
+    
+    try:
+        # Get all halls
+        cur.execute("SELECT id, hall_name FROM halls ORDER BY hall_name")
+        halls = cur.fetchall()
+        
+        result = []
+        for hall in halls:
+            hall_id = hall["id"]
+            hall_name = hall["hall_name"]
+            
+            # Count allocations
+            cur.execute("SELECT COUNT(*) as count FROM room_allocations WHERE hall_id=?", (hall_id,))
+            alloc_count = cur.fetchone()["count"]
+            
+            # Get details
+            cur.execute("""
+                SELECT ra.student_id, s.name, r.room_number
+                FROM room_allocations ra
+                JOIN rooms r ON ra.room_id = r.id
+                JOIN students s ON ra.student_id = s.id
+                WHERE ra.hall_id = ?
+            """, (hall_id,))
+            allocations = cur.fetchall()
+            
+            result.append({
+                "hall_id": hall_id,
+                "hall_name": hall_name,
+                "allocation_count": alloc_count,
+                "allocations": [{"student_id": a["student_id"], "name": a["name"], "room": a["room_number"]} for a in allocations]
+            })
+        
+        con.close()
+        return jsonify({"halls": result}), 200
+    
+    except Exception as e:
+        con.close()
+        return jsonify({"message": str(e)}), 500
+
+
+# -------------------------
+# HALL: Get Allocations
+# -------------------------
+@app.route("/api/hall/allocations")
+def get_allocations():
+    con = get_db()
+    cur = con.cursor()
+    
+    # Get hall_name from query parameter
+    hall_name = (request.args.get("hall_name") or "").strip()
+    
+    # Get hall by name (or fallback to first hall if not provided)
+    if hall_name:
+        cur.execute("SELECT id FROM halls WHERE hall_name = ?", (hall_name,))
+    else:
+        cur.execute("SELECT id FROM halls LIMIT 1")
+    
+    hall_row = cur.fetchone()
+    if not hall_row:
+        con.close()
+        return jsonify({"message": "Hall not found"}), 404
+    
+    hall_id = hall_row["id"]
+    
+    cur.execute("""
+        SELECT 
+            ra.id,
+            ra.hall_id,
+            ra.student_id,
+            r.room_number,
+            ra.allocation_type,
+            ra.allocation_date,
+            s.name as student_name
+        FROM room_allocations ra
+        JOIN rooms r ON ra.room_id = r.id
+        JOIN students s ON ra.student_id = s.id
+        WHERE ra.hall_id = ?
+        ORDER BY r.room_number, ra.allocation_date
+    """, (hall_id,))
+    
+    rows = cur.fetchall()
+    con.close()
+    
+    # Return as flat list (not grouped)
+    allocations = [dict(row) for row in rows]
+    
+    return jsonify({"allocations": allocations}), 200
+
+
+
+
+# -------------------------
+# HALL: Deallocate Student from Room
+# -------------------------
+@app.route("/api/hall/allocate/<allocation_id>", methods=["DELETE"])
+def deallocate_student(allocation_id):
+    con = get_db()
+    cur = con.cursor()
+    
+    try:
+        # Get allocation details
+        cur.execute("""
+            SELECT ra.room_id, ra.student_id
+            FROM room_allocations ra
+            WHERE ra.id=?
+        """, (allocation_id,))
+        alloc_row = cur.fetchone()
+        
+        if not alloc_row:
+            con.close()
+            return jsonify({"message": "Allocation not found"}), 404
+        
+        room_id = alloc_row["room_id"]
+        student_id = alloc_row["student_id"]
+        
+        # Delete allocation
+        cur.execute("DELETE FROM room_allocations WHERE id=?", (allocation_id,))
+        
+        # ✅ Clear the student's hall and room fields
+        cur.execute("UPDATE students SET hall=NULL, room=NULL WHERE id=?", (student_id,))
+        
+        # Update room occupied seats
+        cur.execute("UPDATE rooms SET occupied_seats = occupied_seats - 1 WHERE id=?", (room_id,))
+        
+        con.commit()
+        con.close()
+        
+        return jsonify({"message": "Student deallocated successfully"}), 200
+    
+    except Exception as e:
+        con.close()
+        return jsonify({"message": str(e)}), 500
+
+
+# -------------------------
+# HALL: Create/Update Monthly Fee
+# -------------------------
+@app.route("/api/hall/fees/monthly", methods=["POST"])
+def create_monthly_fee():
+    data = request.json or {}
+    month = (data.get("month") or "").strip()  # YYYY-MM
+    amount = int(data.get("amount") or 0)
+    deadline = (data.get("deadline") or "").strip() or None
+    
+    if not month or amount <= 0:
+        return jsonify({"message": "month and amount required"}), 400
+    
+    con = get_db()
+    cur = con.cursor()
+    
+    try:
+        # Get hall
+        cur.execute("SELECT id FROM halls LIMIT 1")
+        hall_row = cur.fetchone()
+        if not hall_row:
+            con.close()
+            return jsonify({"message": "Hall not found"}), 404
+        
+        hall_id = hall_row["id"]
+        
+        # Check if fee already exists for this month
+        cur.execute("SELECT id FROM hall_monthly_fees WHERE hall_id=? AND month=?", (hall_id, month))
+        if cur.fetchone():
+            con.close()
+            return jsonify({"message": "Fee already exists for this month"}), 409
+        
+        # Insert monthly fee
+        cur.execute("""
+            INSERT INTO hall_monthly_fees (hall_id, month, amount, deadline)
+            VALUES (?, ?, ?, ?)
+        """, (hall_id, month, amount, deadline))
+        
+        con.commit()
+        
+        # Now create dues for all allocated students
+        cur.execute("""
+            SELECT DISTINCT student_id FROM room_allocations WHERE hall_id=?
+        """, (hall_id,))
+        students = cur.fetchall()
+        
+        for student_row in students:
+            student_id = student_row["student_id"]
+            # Check if due already exists
+            cur.execute("""
+                SELECT id FROM hall_dues WHERE student_id=? AND month=?
+            """, (student_id, month))
+            if not cur.fetchone():
+                # Insert new due
+                cur.execute("""
+                    INSERT INTO hall_dues (hall_id, student_id, month, amount, status)
+                    VALUES (?, ?, ?, ?, 'unpaid')
+                """, (hall_id, student_id, month, amount))
+        
+        con.commit()
+        con.close()
+        
+        return jsonify({"message": f"Monthly fee created for {len(students)} student(s)"}), 200
+    
+    except Exception as e:
+        con.close()
+        return jsonify({"message": str(e)}), 500
+
+
+# -------------------------
+# HALL: Get Hall Dues
+# -------------------------
+@app.route("/api/hall/dues")
+def get_hall_dues():
+    con = get_db()
+    cur = con.cursor()
+    
+    # Get hall by name (or fallback to first hall if not provided)
+    hall_name = (request.args.get("hall_name") or "").strip()
+    
+    if hall_name:
+        cur.execute("SELECT id FROM halls WHERE hall_name = ?", (hall_name,))
+    else:
+        cur.execute("SELECT id FROM halls LIMIT 1")
+    
+    hall_row = cur.fetchone()
+    if not hall_row:
+        con.close()
+        return jsonify({"message": "Hall not found"}), 404
+    
+    hall_id = hall_row["id"]
+    
+    cur.execute("""
+        SELECT 
+            hd.id,
+            hd.student_id,
+            s.name as student_name,
+            hd.month,
+            hd.amount,
+            hd.status,
+            hd.paid_date
+        FROM hall_dues hd
+        JOIN students s ON hd.student_id = s.id
+        WHERE hd.hall_id = ?
+        ORDER BY hd.month DESC, hd.student_id
+    """, (hall_id,))
+    
+    rows = cur.fetchall()
+    con.close()
+    
+    dues = [dict(row) for row in rows]
+    
+    return jsonify({"dues": dues}), 200
+
+
+# -------------------------
+# HALL: Mark Due as Paid
+# -------------------------
+@app.route("/api/hall/dues/<due_id>/pay", methods=["POST"])
+def mark_due_paid(due_id):
+    con = get_db()
+    cur = con.cursor()
+    
+    try:
+        # Check if due exists
+        cur.execute("SELECT student_id, amount FROM hall_dues WHERE id=?", (due_id,))
+        due_row = cur.fetchone()
+        
+        if not due_row:
+            con.close()
+            return jsonify({"message": "Due not found"}), 404
+        
+        # Mark as paid
+        paid_date = now_iso()
+        cur.execute("""
+            UPDATE hall_dues SET status='paid', paid_date=? WHERE id=?
+        """, (paid_date, due_id))
+        
+        # Update student's hall_fee
+        student_id = due_row["student_id"]
+        cur.execute("SELECT hall_fee FROM students WHERE id=?", (student_id,))
+        student = cur.fetchone()
+        current_fee = int(student["hall_fee"] or 0)
+        new_fee = max(0, current_fee - int(due_row["amount"]))
+        cur.execute("UPDATE students SET hall_fee=? WHERE id=?", (new_fee, student_id))
+        
+        con.commit()
+        con.close()
+        
+        return jsonify({"message": "Due marked as paid"}), 200
+    
+    except Exception as e:
+        con.close()
+        return jsonify({"message": str(e)}), 500
 
 
 if __name__ == "__main__":

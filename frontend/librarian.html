@@ -131,7 +131,7 @@
   th{color:var(--muted);font-weight:800}
   .badge{display:inline-block;padding:4px 10px;border-radius:999px;font-size:12px;border:1px solid var(--border)}
   .ok{background:#ecfdf5;border-color:#a7f3d0}
-  .warn{background:#fff7ed;border-color:#fed7aa}
+  .warn{background:#f8f3ce;border-color:#de8928}
   .bad{background:#fef2f2;border-color:#fecaca}
   .muted{color:var(--muted);font-size:12px}
 
@@ -512,7 +512,7 @@
             <td>${book.issue_duration}</td>
             <td>${daysLate}</td>
             <td>${fine}</td>
-            <td>Overdue</td>
+            <td>${badge("Overdue")}</td>
           `;
           tbody.appendChild(tr);
         });

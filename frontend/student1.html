@@ -301,7 +301,7 @@
 
   if (!token) window.location.href = "login.html";
 
-  if (role && role !== "student1") {
+  if (role && role !== "student") {
     if (role === "librarian") window.location.href = "librarian.html";
     if (role === "hall_manager") window.location.href = "hall.html";
     if (role === "department_officer") window.location.href = "department.html";
@@ -386,20 +386,26 @@
     try {
       // Get student ID from localStorage
       const studentId = localStorage.getItem("studentId") || "2203177";
+      const url = `${API_BASE}/api/student/${studentId}`;
+      
+      console.log("Fetching from:", url);
 
-      const res = await fetch(`${API_BASE}/api/student/${studentId}`);
+      const res = await fetch(url);
 
       if (!res.ok) {
-        throw new Error("Failed to load student data.");
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP ${res.status}: Failed to load student data.`);
       }
 
       const data = await res.json();
+      console.log("Student data:", data);
 
       renderStudent(data);
       showMsg("Loaded from database ✅", "ok");
 
     } catch (err) {
-      showMsg("Backend not reachable ❌", "err");
+      console.error("Error loading student:", err.message);
+      showMsg(`Backend error: ${err.message}`, "err");
     }
   }
 

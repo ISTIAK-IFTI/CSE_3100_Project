@@ -213,6 +213,7 @@
       if (role === "librarian") window.location.href = "librarian.html";
       if (role === "hall_manager") window.location.href = "hall.html";
       if (role === "department_officer") window.location.href = "department.html";
+      else if (role !== "student") window.location.href = "login.html";
     }
 
     // localStorage.setItem("studentId",localStorage.getItem("identifier"))
@@ -250,21 +251,28 @@
       try {
         setStatus("Loading dashboard…");
 
-        // 1) Profile
+        // Get student ID from localStorage
+        const studentId = localStorage.getItem("studentId");
+        if (!studentId) {
+          setStatus("Student ID not found. Please login again.");
+          return;
+        }
+
+        // 1) Profile - Pass studentId to API
         // Expected: { name,id,dept,session,email,hall,room,seatType }
-        const profile = await api("/api/student/me");
+        const profile = await api(`/api/student/me?id=${studentId}`);
         $("studentName").textContent = profile.name || "Student";
         $("studentId").textContent = profile.id || profile.identifier || "—";
         $("studentDept").textContent = profile.dept || "—";
         $("studentSession").textContent = profile.session || "—";
         $("studentEmail").textContent = profile.email || "—";
-        $("studentHall").textContent = profile.hall || "—";
-        $("studentRoom").textContent = profile.room || "—";
+        $("studentHall").textContent = profile.hall || "—";  // ✅ Now shows hall name
+        $("studentRoom").textContent = profile.room || "—";  // ✅ Now shows room number
         $("seatType").textContent = profile.seatType || "—";
 
         // 2) Dues
         // Expected: { items:[{feeType, period, amount, status}] }
-        const dues = await api("/api/student/dues");
+        const dues = await api(`/api/student/dues?id=${studentId}`);
         const duesBody = $("duesBody");
         if (!dues.items || dues.items.length === 0) {
           duesBody.innerHTML = `<tr><td colspan="4" class="muted">No dues found.</td></tr>`;
@@ -286,7 +294,7 @@
 
         // 3) Payments
         // Expected: { items:[{date, receiptNo, amount, status}] }
-        const payments = await api("/api/student/payments");
+        const payments = await api(`/api/student/payments?id=${studentId}`);
         const payBody = $("paymentsBody");
         if (!payments.items || payments.items.length === 0) {
           payBody.innerHTML = `<tr><td colspan="4" class="muted">No payments yet.</td></tr>`;

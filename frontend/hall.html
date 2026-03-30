@@ -86,7 +86,7 @@
     <aside class="sidebar">
       <div class="brand">
         RUET Portal
-        <small>Hall Manager Dashboard</small>
+        <small id="hallName">---</small>
       </div>
 
       <nav class="nav">
@@ -104,7 +104,7 @@
     <main class="content">
       <div class="topbar">
         <div class="title">
-          <h1>Hall Management</h1>
+          <h1 id="hallTitle">Hall Management</h1>
           <p>Room allocation • Monthly hall fees • Hall due tracking</p>
         </div>
         <div class="pill" id="modePill">Mode: —</div>
@@ -131,9 +131,10 @@
         <div class="card col-8" id="allocate">
           <h2>Allocate Room</h2>
           <div class="form-grid">
-            <div>
-              <label>Hall Name</label>
-              <input id="hallName" placeholder="e.g., Bangabandhu Hall" />
+            <div class="kv">
+              <!-- <label>Hall Name</label>
+              <input id="hallName" placeholder="e.g., Bangabandhu Hall" /> -->
+              <div class="v" id="allocHallName">Demo Hall Name</div>
             </div>
             <div>
               <label>Room Number</label>
@@ -146,10 +147,10 @@
                 <option value="shared4">Shared (4 students)</option>
               </select>
             </div>
-            <div>
+            <!-- <div>
               <label>Seat No (optional)</label>
               <input id="seatNo" placeholder="e.g., A / 1" />
-            </div>
+            </div> -->
           </div>
 
           <label style="margin-top:12px;">Student IDs (enter 1 or 4 IDs based on allocation type)</label>
@@ -157,11 +158,11 @@
 
           <div class="row-actions">
             <button class="btn primary" id="allocateBtn">Allocate</button>
-            <button class="btn" id="deallocateBtn">Deallocate (Demo)</button>
+            <button class="btn" id="deallocateBtn">Clear Form</button>
           </div>
 
           <p class="muted" style="margin-top:10px;">
-            Later backend API: <code>POST /api/hall/allocate</code>, <code>DELETE /api/hall/allocate/:id</code>
+            To remove a student: Go to <strong>Current Allocations</strong> table below and click <strong>Remove</strong>.
           </p>
         </div>
 
@@ -193,21 +194,22 @@
             <thead>
               <tr>
                 <th>Allocation ID</th>
-                <th>Hall</th>
                 <th>Room</th>
+                <th>Student ID</th>
+                <th>Student Name</th>
                 <th>Type</th>
-                <th>Students</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody id="allocBody">
-              <tr><td colspan="5" class="muted">Loading…</td></tr>
+              <tr><td colspan="6" class="muted">Loading…</td></tr>
             </tbody>
           </table>
         </div>
 
         <!-- Hall dues -->
         <div class="card col-12" id="dues">
-          <h2>Hall Dues (Demo)</h2>
+          <h2>Hall Dues</h2>
           <table>
             <thead>
               <tr>
@@ -227,9 +229,13 @@
   </div>
 
   <script>
+    // ===== CONFIG =====
+    const API_BASE = "http://127.0.0.1:5000";
+
     // ===== AUTH GUARD =====
     const token = localStorage.getItem("token");
     const role = (localStorage.getItem("role") || "").toLowerCase();
+    const hallName = localStorage.getItem("hall_name") || "Hall Manager";
 
     if (!token) window.location.href = "login.html";
     if (role && role !== "hall_manager") {
@@ -250,58 +256,131 @@
       return `<span class="badge bad">UNPAID</span>`;
     }
     function setModePill(){
-      $("modePill").textContent = "Mode: Demo";
+      $("modePill").textContent = "Mode: Backend";
     }
 
-    // ===== DEMO STATE =====
-    const DEMO = {
-      monthlyFee: 500,
-      roomsTotal: 120,
-      allocations: [
-        { id: "AL-1001", hall: "Bangabandhu Hall", room: "204", type: "Shared (4)", students: ["2203177","2203188","2203190","2203201"] },
-        { id: "AL-1002", hall: "Bangamata Hall", room: "105", type: "Single (1)", students: ["2203222"] }
-      ],
-      dues: [
-        { studentId: "2203177", month: "2026-02", amount: 500, status: "unpaid" },
-        { studentId: "2203188", month: "2026-02", amount: 500, status: "paid" },
-        { studentId: "2203222", month: "2026-02", amount: 500, status: "unpaid" }
-      ]
-    };
+    // ===== RENDER DASHBOARD =====
+    async function render(){
+      console.log("🔄 Rendering dashboard...");
+      try {
+        // Fetch dashboard data with hall_name parameter
+        const res = await fetch(`${API_BASE}/api/hall/render?hall_name=${encodeURIComponent(hallName)}`);
+        if (!res.ok) {
+          setStatus("Error loading dashboard data");
+          return;
+        }
+        const data = await res.json();
 
-    function render(){
-      $("totalRooms").textContent = String(DEMO.roomsTotal);
-      const allocatedSeats = DEMO.allocations.reduce((s,a)=> s + a.students.length, 0);
-      $("allocatedSeats").textContent = String(allocatedSeats);
+        $("totalRooms").textContent = String(data.totalRooms || 0);
+        $("allocatedSeats").textContent = String(data.allocatedSeats || 0);
+        $("unpaidCount").textContent = String(data.unpaidCount || 0);
+        $("monthlyFee").textContent = money(data.monthlyFee || 0);
 
-      const unpaid = DEMO.dues.filter(d => d.status !== "paid").length;
-      $("unpaidCount").textContent = String(unpaid);
+        // Fetch allocations
+        console.log("📋 About to fetch allocations...");
+        console.log("Calling renderAllocations() now...");
+        await renderAllocations();
+        console.log("✅ renderAllocations() completed");
 
-      $("monthlyFee").textContent = money(DEMO.monthlyFee);
+        // Fetch hall dues with hall_name parameter
+        console.log("📋 About to fetch dues...");
+        const duesRes = await fetch(`${API_BASE}/api/hall/dues?hall_name=${encodeURIComponent(hallName)}`);
+        if (duesRes.ok) {
+          const duesData = await duesRes.json();
+          renderDues(duesData.dues || []);
+        }
 
-      // allocations
-      const allocBody = $("allocBody");
-      if (!DEMO.allocations.length){
-        allocBody.innerHTML = `<tr><td colspan="5" class="muted">No allocations yet.</td></tr>`;
-      } else {
-        allocBody.innerHTML = DEMO.allocations.map(a => `
-          <tr>
-            <td>${a.id}</td>
-            <td>${a.hall}</td>
-            <td>${a.room}</td>
-            <td>${a.type}</td>
-            <td>${a.students.join(", ")}</td>
-          </tr>
-        `).join("");
+        setStatus("Dashboard loaded successfully");
+      } catch (err) {
+        console.error("🔴 render() error:", err);
+        setStatus("Error: " + err.message);
       }
+    }
 
-      // dues
+    // ===== RENDER ALLOCATIONS TABLE =====
+    async function renderAllocations() {
+      const allocBody = $("allocBody");
+      
+      console.log("🔍 renderAllocations() called");
+      console.log("hallName value:", hallName);
+      
+      // Check if hallName is set
+      if (!hallName || hallName === "---" || hallName === "Hall Manager") {
+        console.warn("⚠️  hallName not properly set:", hallName);
+        allocBody.innerHTML = `<tr><td colspan="6" class="muted">Hall not loaded. Please refresh the page.</td></tr>`;
+        return;
+      }
+      
+      try {
+        const url = `${API_BASE}/api/hall/allocations?hall_name=${encodeURIComponent(hallName)}`;
+        console.log("📍 Fetching allocations from:", url);
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        
+        const res = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        
+        console.log("📊 Response status:", res.status);
+        console.log("📊 Response headers:", res.headers);
+        
+        if (!res.ok) {
+          let errorMsg = `HTTP ${res.status}`;
+          try {
+            const errorData = await res.json();
+            errorMsg = errorData.message || errorMsg;
+          } catch (e) {
+            errorMsg = `HTTP ${res.status}: ${res.statusText}`;
+          }
+          console.error("❌ API Error:", errorMsg);
+          allocBody.innerHTML = `<tr><td colspan="6" class="muted">Error: ${errorMsg}</td></tr>`;
+          return;
+        }
+        
+        const data = await res.json();
+        console.log("✅ Allocations data received:", data);
+        
+        const allocations = data.allocations || [];
+        const count = allocations.length;
+        console.log(`📋 Found ${count} allocations`);
+
+        if (!allocations.length) {
+          console.log("ℹ️  No allocations found");
+          allocBody.innerHTML = `<tr><td colspan="6" class="muted">No allocations found for: ${hallName}</td></tr>`;
+        } else {
+          console.log("🎯 Rendering", allocations.length, "rows");
+          allocBody.innerHTML = allocations.map(a => `
+            <tr>
+              <td><strong>${a.id}</strong></td>
+              <td>${a.room_number}</td>
+              <td>${a.student_id}</td>
+              <td>${a.student_name}</td>
+              <td>${a.allocation_type === 'single' ? 'Single' : 'Shared (4)'}</td>
+              <td><button class="btn" onclick="deallocateById(${a.id})">Remove</button></td>
+            </tr>
+          `).join("");
+          console.log("✅ Allocations rendered successfully");
+        }
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          console.error("⏱️  Request timeout");
+          allocBody.innerHTML = `<tr><td colspan="6" class="muted">Request timeout - server not responding</td></tr>`;
+        } else {
+          console.error("🔴 Allocation fetch error:", err.message, err);
+          allocBody.innerHTML = `<tr><td colspan="6" class="muted">Error: ${err.message}</td></tr>`;
+        }
+      }
+    }
+
+    // ===== RENDER DUES TABLE =====
+    function renderDues(dues) {
       const duesBody = $("duesBody");
-      if (!DEMO.dues.length){
+      if (!dues.length) {
         duesBody.innerHTML = `<tr><td colspan="4" class="muted">No dues found.</td></tr>`;
       } else {
-        duesBody.innerHTML = DEMO.dues.map(d => `
+        duesBody.innerHTML = dues.map(d => `
           <tr>
-            <td>${d.studentId}</td>
+            <td>${d.student_name || d.student_id}</td>
             <td>${d.month}</td>
             <td>${money(d.amount)}</td>
             <td>${badgePaid(d.status)}</td>
@@ -310,86 +389,160 @@
       }
     }
 
+    // ===== UPDATE HALL NAME =====
+    $("hallName").textContent = hallName;
+    $("hallTitle").textContent = hallName + " Management";
+    $("allocHallName").textContent = hallName;
+    
+    // Debug: Log values
+    console.log("Hall Name:", hallName);
+    console.log("Token:", token);
+    console.log("Role:", role);
+
     // ===== ACTIONS =====
-    $("refreshBtn").addEventListener("click", () => {
-      setStatus("Refreshed.");
-      render();
+    $("refreshBtn").addEventListener("click", async () => {
+      setStatus("Refreshing...");
+      await render();
     });
 
-    $("allocateBtn").addEventListener("click", () => {
-      const hall = $("hallName").value.trim() || "Unknown Hall";
+    // ===== ALLOCATE STUDENT =====
+    $("allocateBtn").addEventListener("click", async () => {
       const room = $("roomNo").value.trim();
       const type = $("allocType").value;
       const idsText = $("studentIds").value.trim();
 
-      if (!room || !idsText){
+      if (!room || !idsText) {
         setStatus("Please provide Room Number and Student IDs.");
         return;
       }
 
       const ids = idsText.split(",").map(x => x.trim()).filter(Boolean);
-      if (type === "single" && ids.length !== 1){
+      
+      if (type === "single" && ids.length !== 1) {
         setStatus("Single allocation requires exactly 1 Student ID.");
         return;
       }
-      if (type === "shared4" && ids.length !== 4){
+      if (type === "shared4" && ids.length !== 4) {
         setStatus("Shared (4) allocation requires exactly 4 Student IDs.");
         return;
       }
 
-      const newId = "AL-" + (1000 + DEMO.allocations.length + 1);
-      DEMO.allocations.unshift({
-        id: newId,
-        hall,
-        room,
-        type: (type === "single") ? "Single (1)" : "Shared (4)",
-        students: ids
-      });
+      try {
+        setStatus("Allocating...");
+        const res = await fetch(`${API_BASE}/api/hall/allocate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            hallName: hallName,  // ✅ Pass hall name so backend knows which hall
+            roomNumber: room,
+            allocType: type,
+            studentIds: ids
+          })
+        });
 
-      setStatus(`Allocation saved (Demo). Allocation ID: ${newId}`);
-      render();
+        const result = await res.json();
+        
+        if (!res.ok) {
+          setStatus("Error: " + (result.message || "Failed to allocate"));
+          return;
+        }
+
+        setStatus(result.message);
+        $("roomNo").value = "";
+        $("studentIds").value = "";
+        $("allocType").value = "single";
+        
+        // Refresh dashboard
+        setTimeout(() => render(), 500);
+      } catch (err) {
+        setStatus("Error: " + err.message);
+      }
     });
 
-    $("deallocateBtn").addEventListener("click", () => {
-      if (!DEMO.allocations.length){
-        setStatus("No allocations to remove.");
+    // ===== DEALLOCATE BY ID (called from allocation table) =====
+    async function deallocateById(allocationId) {
+      if (!confirm(`Are you sure you want to deallocate this student?`)) {
         return;
       }
-      const removed = DEMO.allocations.shift();
-      setStatus(`Deallocated (Demo): ${removed.id}`);
-      render();
+
+      try {
+        setStatus("Deallocating...");
+        const res = await fetch(`${API_BASE}/api/hall/allocate/${allocationId}`, {
+          method: "DELETE"
+        });
+
+        const result = await res.json();
+        
+        if (!res.ok) {
+          setStatus("Error: " + (result.message || "Failed to deallocate"));
+          return;
+        }
+
+        setStatus(result.message);
+        setTimeout(() => render(), 500);
+      } catch (err) {
+        setStatus("Error: " + err.message);
+      }
+    }
+
+    // ===== DEALLOCATE STUDENT (Legacy - can now just use table) =====
+    $("deallocateBtn").addEventListener("click", async () => {
+      setStatus("ℹ️ Select a student from the 'Current Allocations' table above to deallocate.");
     });
 
-    $("createFeeBtn").addEventListener("click", () => {
-      const month = $("feeMonth").value;      // YYYY-MM
+    // ===== CREATE MONTHLY FEE =====
+    $("createFeeBtn").addEventListener("click", async () => {
+      const month = $("feeMonth").value;
       const amount = Number($("feeAmount").value || 0);
+      const deadline = $("feeDeadline").value || null;
 
-      if (!month || amount <= 0){
+      if (!month || amount <= 0) {
         setStatus("Please select Month and enter a valid Amount.");
         return;
       }
 
-      DEMO.monthlyFee = amount;
+      try {
+        setStatus("Creating monthly fee...");
+        const res = await fetch(`${API_BASE}/api/hall/fees/monthly`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            month: month,
+            amount: amount,
+            deadline: deadline
+          })
+        });
 
-      // demo: create dues for all allocated students
-      const allStudents = [...new Set(DEMO.allocations.flatMap(a => a.students))];
-      allStudents.forEach(sid => {
-        DEMO.dues.unshift({ studentId: sid, month, amount, status: "unpaid" });
-      });
+        const result = await res.json();
+        
+        if (!res.ok) {
+          setStatus("Error: " + (result.message || "Failed to create fee"));
+          return;
+        }
 
-      setStatus(`Monthly fee created (Demo) for ${allStudents.length} students.`);
-      render();
+        setStatus(result.message);
+        $("feeMonth").value = "";
+        $("feeAmount").value = "";
+        $("feeDeadline").value = "";
+        
+        // Refresh dashboard
+        setTimeout(() => render(), 500);
+      } catch (err) {
+        setStatus("Error: " + err.message);
+      }
     });
 
+    // ===== LOGOUT =====
     $("logoutBtn").addEventListener("click", () => {
       localStorage.removeItem("token");
       localStorage.removeItem("role");
+      localStorage.removeItem("hall_name");
       window.location.href = "login.html";
     });
 
+    // ===== INITIALIZATION =====
     setModePill();
     render();
-    setStatus("Loaded.");
   </script>
 </body>
 </html>

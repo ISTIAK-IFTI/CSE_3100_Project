@@ -180,7 +180,7 @@
   function redirectByRole(role) {
     const r = (role || "").toLowerCase();
 
-    if (r === "student1") {
+    if (r === "student") {
       window.location.href = "student1.html";
     }
     else if (r === "librarian") {
@@ -240,6 +240,7 @@
       localStorage.setItem("studentId", data.studentId);
 
       if (data.name) localStorage.setItem("name", data.name);   // ✅ IMPORTANT
+      if (data.hall_name) localStorage.setItem("hall_name", data.hall_name);   // ✅ Hall Manager
 
       showMsg("Login successful. Redirecting...", "ok");
 
