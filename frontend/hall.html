@@ -66,6 +66,14 @@
     .ok{background:#ecfdf5;border-color:#a7f3d0}
     .bad{background:#fef2f2;border-color:#fecaca}
     .muted{color:var(--muted);font-size:12px}
+    .highlight{background:#fef3c7 !important}
+    .search-box{display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+    .search-box input{flex:1;min-width:200px;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:12px}
+
+    #allocations, #dues, #roomInventory {
+      max-height: 500px;
+      overflow-y: auto;
+    }
 
     .col-12{grid-column:span 12}
     .col-8{grid-column:span 8}
@@ -153,7 +161,7 @@
             </div> -->
           </div>
 
-          <label style="margin-top:12px;">Student IDs (enter 1 or 4 IDs based on allocation type)</label>
+          <label style="margin-top:12px;">Student IDs (enter students to allocate)</label>
           <input id="studentIds" placeholder="e.g., 2203177, 2203188, 2203190, 2203201" />
 
           <div class="row-actions">
@@ -161,9 +169,6 @@
             <button class="btn" id="deallocateBtn">Clear Form</button>
           </div>
 
-          <p class="muted" style="margin-top:10px;">
-            To remove a student: Go to <strong>Current Allocations</strong> table below and click <strong>Remove</strong>.
-          </p>
         </div>
 
         <!-- Monthly Fee -->
@@ -185,6 +190,30 @@
           <p class="muted" style="margin-top:10px;">
             Later backend API: <code>POST /api/hall/fees/monthly</code>
           </p>
+        </div>
+
+        <!-- Room Inventory -->
+        <div class="card col-12" id="roomInventory">
+          <h2>Room Inventory</h2>
+          <div class="search-box">
+            <input type="text" id="searchRoom" placeholder="Search by room number..." />
+            <input type="text" id="searchStudent" placeholder="Search by student ID..." />
+            <button class="btn" id="clearSearchBtn">Clear Search</button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Room Number</th>
+                <th>Type</th>
+                <th>Occupancy</th>
+                <th>Students</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="roomBody">
+              <tr><td colspan="5" class="muted">Loading…</td></tr>
+            </tbody>
+          </table>
         </div>
 
         <!-- Allocations Table -->
@@ -275,6 +304,11 @@
         $("allocatedSeats").textContent = String(data.allocatedSeats || 0);
         $("unpaidCount").textContent = String(data.unpaidCount || 0);
         $("monthlyFee").textContent = money(data.monthlyFee || 0);
+
+        // Fetch room inventory
+        console.log("📋 About to fetch rooms...");
+        await renderRooms();
+        console.log("✅ renderRooms() completed");
 
         // Fetch allocations
         console.log("📋 About to fetch allocations...");
@@ -389,6 +423,132 @@
       }
     }
 
+    // ===== RENDER ROOM INVENTORY =====
+    async function renderRooms() {
+      const roomBody = $("roomBody");
+      
+      console.log("🔍 renderRooms() called");
+      
+      if (!hallName || hallName === "---" || hallName === "Hall Manager") {
+        console.warn("⚠️  hallName not properly set:", hallName);
+        roomBody.innerHTML = `<tr><td colspan="5" class="muted">Hall not loaded. Please refresh the page.</td></tr>`;
+        return;
+      }
+      
+      try {
+        const url = `${API_BASE}/api/hall/rooms?hall_name=${encodeURIComponent(hallName)}`;
+        console.log("📍 Fetching rooms from:", url);
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        
+        const res = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        
+        console.log("📊 Response status:", res.status);
+        
+        if (!res.ok) {
+          let errorMsg = `HTTP ${res.status}`;
+          try {
+            const errorData = await res.json();
+            errorMsg = errorData.message || errorMsg;
+          } catch (e) {
+            errorMsg = `HTTP ${res.status}: ${res.statusText}`;
+          }
+          console.error("❌ API Error:", errorMsg);
+          roomBody.innerHTML = `<tr><td colspan="5" class="muted">Error: ${errorMsg}</td></tr>`;
+          return;
+        }
+        
+        const data = await res.json();
+        console.log("✅ Rooms data received:", data);
+        
+        const rooms = data.rooms || [];
+        console.log(`📋 Found ${rooms.length} rooms`);
+
+        if (!rooms.length) {
+          console.log("ℹ️  No rooms found");
+          roomBody.innerHTML = `<tr><td colspan="5" class="muted">No rooms found for: ${hallName}</td></tr>`;
+        } else {
+          console.log("🎯 Rendering", rooms.length, "rooms");
+          roomBody.innerHTML = rooms.map(r => `
+            <tr>
+              <td><strong>${r.room_number}</strong></td>
+              <td>${r.type === 'single' ? 'Single' : 'Shared (4)'}</td>
+              <td>${r.current_occupancy}/${r.max_capacity}</td>
+              <td>${r.student_list || (r.current_occupancy + ' students')}</td>
+              <td><span class="badge ${r.current_occupancy === r.max_capacity ? 'ok' : 'bad'}">${r.current_occupancy === r.max_capacity ? 'FULL' : 'AVAILABLE'}</span></td>
+            </tr>
+          `).join("");
+          console.log("✅ Rooms rendered successfully");
+          await loadAndStoreRooms();
+        }
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          console.error("⏱️  Request timeout");
+          roomBody.innerHTML = `<tr><td colspan="5" class="muted">Request timeout - server not responding</td></tr>`;
+        } else {
+          console.error("🔴 Room fetch error:", err.message, err);
+          roomBody.innerHTML = `<tr><td colspan="5" class="muted">Error: ${err.message}</td></tr>`;
+        }
+      }
+    }
+
+    // ===== ROOM INVENTORY SEARCH =====
+    let allRooms = [];
+
+    async function loadAndStoreRooms() {
+      if (!hallName || hallName === "---" || hallName === "Hall Manager") return;
+      try {
+        const url = `${API_BASE}/api/hall/rooms?hall_name=${encodeURIComponent(hallName)}`;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        const res = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          const data = await res.json();
+          allRooms = data.rooms || [];
+        }
+      } catch (err) {
+        console.error("Error loading rooms:", err);
+      }
+    }
+
+    function highlightSearchResults() {
+      const roomBody = $("roomBody");
+      const searchRoom = $("searchRoom").value.trim().toLowerCase();
+      const searchStudent = $("searchStudent").value.trim().toLowerCase();
+      
+      if (!searchRoom && !searchStudent) {
+        allRooms.forEach((r, idx) => {
+          const row = roomBody.rows[idx];
+          if (row) row.classList.remove("highlight");
+        });
+        return;
+      }
+      
+      allRooms.forEach((r, idx) => {
+        const row = roomBody.rows[idx];
+        if (!row) return;
+        const roomMatch = r.room_number.toLowerCase().includes(searchRoom);
+        const studentMatch = r.student_list.toLowerCase().includes(searchStudent);
+        if ((searchRoom && roomMatch) || (searchStudent && studentMatch)) {
+          row.classList.add("highlight");
+        } else {
+          row.classList.remove("highlight");
+        }
+      });
+    }
+
+    $("searchRoom").addEventListener("input", highlightSearchResults);
+    $("searchStudent").addEventListener("input", highlightSearchResults);
+    $("clearSearchBtn").addEventListener("click", () => {
+      $("searchRoom").value = "";
+      $("searchStudent").value = "";
+      highlightSearchResults();
+      setStatus("Search cleared");
+    });
+
     // ===== UPDATE HALL NAME =====
     $("hallName").textContent = hallName;
     $("hallTitle").textContent = hallName + " Management";
@@ -418,12 +578,15 @@
 
       const ids = idsText.split(",").map(x => x.trim()).filter(Boolean);
       
+      // ✅ Updated validation:
+      // - For single: must be exactly 1
+      // - For shared4: can be 1-4 (backend will enforce 4 for new rooms)
       if (type === "single" && ids.length !== 1) {
         setStatus("Single allocation requires exactly 1 Student ID.");
         return;
       }
-      if (type === "shared4" && ids.length !== 4) {
-        setStatus("Shared (4) allocation requires exactly 4 Student IDs.");
+      if (type === "shared4" && (ids.length < 1 || ids.length > 4)) {
+        setStatus("Shared (4) room must have 1-4 Student IDs.");
         return;
       }
 
@@ -485,9 +648,12 @@
       }
     }
 
-    // ===== DEALLOCATE STUDENT (Legacy - can now just use table) =====
-    $("deallocateBtn").addEventListener("click", async () => {
-      setStatus("ℹ️ Select a student from the 'Current Allocations' table above to deallocate.");
+    // ===== CLEAR ALLOCATION FORM =====
+    $("deallocateBtn").addEventListener("click", () => {
+      $("roomNo").value = "";
+      $("studentIds").value = "";
+      $("allocType").value = "single";
+      setStatus("Form cleared");
     });
 
     // ===== CREATE MONTHLY FEE =====

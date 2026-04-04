@@ -796,11 +796,9 @@ def allocate_student():
     if not student_ids or not room_number or not hall_name:
         return jsonify({"message": "studentIds, roomNumber, and hallName required"}), 400
     
-    # Validate count
-    if alloc_type == "single" and len(student_ids) != 1:
-        return jsonify({"message": "Single allocation requires 1 student"}), 400
-    if alloc_type == "shared4" and len(student_ids) != 4:
-        return jsonify({"message": "Shared (4) allocation requires 4 students"}), 400
+    # Validate at least 1 student
+    if len(student_ids) < 1:
+        return jsonify({"message": "At least 1 student ID required"}), 400
     
     con = get_db()
     cur = con.cursor()
@@ -816,19 +814,31 @@ def allocate_student():
         hall_id = hall_row["id"]
         
         # Check if room exists for this hall
-        cur.execute("SELECT id FROM rooms WHERE hall_id=? AND room_number=?", (hall_id, room_number))
+        cur.execute("SELECT id, capacity FROM rooms WHERE hall_id=? AND room_number=?", (hall_id, room_number))
         room_row = cur.fetchone()
         
         if not room_row:
-            # Create room if doesn't exist
+            # ✅ NEW ROOM: Create with declared capacity
             capacity = 1 if alloc_type == "single" else 4
+            
+            # For new shared(4) rooms, must start with exactly 4 students
+            if alloc_type == "shared4" and len(student_ids) != 4:
+                con.close()
+                return jsonify({"message": "For new shared(4) room, must allocate exactly 4 students initially. Then you can add/remove students from existing rooms."}), 400
+            
+            # For new single rooms, must be exactly 1
+            if alloc_type == "single" and len(student_ids) != 1:
+                con.close()
+                return jsonify({"message": "Single allocation requires exactly 1 student"}), 400
+            
             cur.execute("""
                 INSERT INTO rooms (hall_id, room_number, capacity, occupied_seats)
                 VALUES (?, ?, ?, 0)
             """, (hall_id, room_number, capacity))
             con.commit()
-            cur.execute("SELECT id FROM rooms WHERE hall_id=? AND room_number=?", (hall_id, room_number))
+            cur.execute("SELECT id, capacity FROM rooms WHERE hall_id=? AND room_number=?", (hall_id, room_number))
             room_row = cur.fetchone()
+        # ✅ If room exists, no strict count requirement - capacity check below handles it
         
         room_id = room_row["id"]
         
@@ -980,6 +990,80 @@ def get_allocations():
     return jsonify({"allocations": allocations}), 200
 
 
+
+
+# -------------------------
+# HALL: Get Room Inventory
+# -------------------------
+@app.route("/api/hall/rooms")
+def get_rooms():
+    con = get_db()
+    cur = con.cursor()
+    
+    # Get hall_name from query parameter
+    hall_name = (request.args.get("hall_name") or "").strip()
+    
+    # Get hall by name (or fallback to first hall if not provided)
+    if hall_name:
+        cur.execute("SELECT id FROM halls WHERE hall_name = ?", (hall_name,))
+    else:
+        cur.execute("SELECT id FROM halls LIMIT 1")
+    
+    hall_row = cur.fetchone()
+    if not hall_row:
+        con.close()
+        return jsonify({"message": "Hall not found"}), 404
+    
+    hall_id = hall_row["id"]
+    
+    # Get all rooms with allocation details
+    cur.execute("""
+        SELECT 
+            r.id,
+            r.hall_id,
+            r.room_number,
+            r.capacity,
+            r.occupied_seats,
+            CASE 
+                WHEN r.capacity = 1 THEN 'single'
+                ELSE 'shared'
+            END as type
+        FROM rooms r
+        WHERE r.hall_id = ?
+        ORDER BY CAST(r.room_number AS INTEGER)
+    """, (hall_id,))
+    
+    room_rows = cur.fetchall()
+    
+    rooms = []
+    for room in room_rows:
+        room_id = room["id"]
+        
+        # Get students in this room
+        cur.execute("""
+            SELECT 
+                ra.student_id,
+                s.name
+            FROM room_allocations ra
+            JOIN students s ON ra.student_id = s.id
+            WHERE ra.room_id = ?
+            ORDER BY ra.allocation_date
+        """, (room_id,))
+        
+        student_rows = cur.fetchall()
+        student_list = ", ".join([f"{s['student_id']}" for s in student_rows])
+        
+        rooms.append({
+            "room_number": room["room_number"],
+            "type": room["type"],
+            "max_capacity": room["capacity"],
+            "current_occupancy": room["occupied_seats"],
+            "student_list": student_list if student_list else ""
+        })
+    
+    con.close()
+    
+    return jsonify({"rooms": rooms}), 200
 
 
 # -------------------------
