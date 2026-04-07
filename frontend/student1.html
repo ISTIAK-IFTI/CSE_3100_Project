@@ -265,6 +265,7 @@
           <tr>
             <th>Item</th>
             <th>Amount</th>
+            <th>Account</th>
           </tr>
         </thead>
         <tbody id="dueBody">
@@ -342,7 +343,7 @@
   // =========================
   // 3) RENDER FUNCTION
   // =========================
-  function renderStudent(data) {
+  function renderStudent(data, monthlyFees = []) {
     elName.textContent = data?.name ?? "—";
     elStudentId.textContent = data?.studentId ?? "—";
     elDept.textContent = data?.dept ?? "—";
@@ -353,24 +354,42 @@
     // elPhoto.src = "https://via.placeholder.com/300?text=Student+Photo";
     elPhoto.src = `media/students/${data.studentId}.jpg`;
 
-    // due (mock for now)
-    const total = data?.due?.total ?? 0;
+    // Old dues (filter out "Hall Fee" since we now show monthly fees separately)
+    let items = data?.due?.items ?? [];
+    items = items.filter(item => item.title !== "Hall Fee");
+    
+    // Add account info to old dues (Library Fine, Department Fee don't have specific accounts)
+    items = items.map(item => ({
+      ...item,
+      account: "—"
+    }));
+    
+    // Monthly fees with hall account names
+    const monthlyFeesItems = (monthlyFees || []).map(f => ({
+      title: `Hall Fee (${f.month})`,
+      amount: f.amount,
+      account: f.account_name || "—"
+    }));
+    
+    const allItems = [...items, ...monthlyFeesItems];
+
+    // Calculate total due (including monthly fees)
+    const total = allItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
     elTotalDue.textContent = money(total);
 
     dueBody.innerHTML = "";
 
-    const items = data?.due?.items ?? [];
-
-    if (!items.length) {
+    if (!allItems.length) {
       const tr = document.createElement("tr");
-      tr.innerHTML = `<td colspan="2" style="color:#6b7280;">No dues found.</td>`;
+      tr.innerHTML = `<td colspan="3" style="color:#6b7280;">No dues found.</td>`;
       dueBody.appendChild(tr);
     } else {
-      for (const it of items) {
+      for (const it of allItems) {
         const tr = document.createElement("tr");
         tr.innerHTML = `
           <td>${it.title ?? "-"}</td>
           <td>${money(it.amount ?? 0)}</td>
+          <td>${it.account ?? "-"}</td>
         `;
         dueBody.appendChild(tr);
       }
@@ -388,7 +407,7 @@
       const studentId = localStorage.getItem("studentId") || "2203177";
       const url = `${API_BASE}/api/student/${studentId}`;
       
-      console.log("Fetching from:", url);
+      console.log("Fetching student profile from:", url);
 
       const res = await fetch(url);
 
@@ -400,7 +419,23 @@
       const data = await res.json();
       console.log("Student data:", data);
 
-      renderStudent(data);
+      // Fetch monthly hall fees
+      let monthlyFees = [];
+      try {
+        console.log("Fetching monthly hall fees from:", `${API_BASE}/api/student/hall-fees?id=${studentId}`);
+        const hallFeesRes = await fetch(`${API_BASE}/api/student/hall-fees?id=${studentId}`);
+        if (hallFeesRes.ok) {
+          const hallFeesData = await hallFeesRes.json();
+          monthlyFees = hallFeesData.items || [];
+          console.log("Monthly hall fees:", monthlyFees);
+        } else {
+          console.warn("Could not fetch monthly fees:", hallFeesRes.status);
+        }
+      } catch (err) {
+        console.warn("Error fetching monthly hall fees:", err.message);
+      }
+
+      renderStudent(data, monthlyFees);
       showMsg("Loaded from database ✅", "ok");
 
     } catch (err) {

@@ -100,7 +100,8 @@
       <nav class="nav">
         <a class="active" href="hall.html">Dashboard</a>
         <a href="#allocate">Room Allocation</a>
-        <a href="#fees">Monthly Hall Fee</a>
+        <!-- <a href="#accounts">Hall Accounts</a> -->
+        <a href="#advancedFees">Create Fee</a>
         <a href="#allocations">Allocations</a>
         <a href="#dues">Hall Dues</a>
       </nav>
@@ -171,8 +172,8 @@
 
         </div>
 
-        <!-- Monthly Fee -->
-        <div class="card col-4" id="fees">
+        <!-- Monthly Fee (DEPRECATED - Replaced by Create Fee Advanced below) -->
+        <!-- <div class="card col-4" id="fees">
           <h2>Create Monthly Hall Fee</h2>
           <label>Month</label>
           <input id="feeMonth" type="month" />
@@ -188,8 +189,57 @@
           </div>
 
           <p class="muted" style="margin-top:10px;">
-            Later backend API: <code>POST /api/hall/fees/monthly</code>
+            Creates fee for all students
           </p>
+        </div> -->
+
+        <!-- Hall Accounts (TEMPORARILY DISABLED) -->
+        <!-- <div class="card col-4" id="accounts">
+          <h2>Hall Payment Accounts</h2>
+          <label>Account Name</label>
+          <input id="accName" placeholder="e.g., Hamid Hall Account" />
+
+          <label>Account Number (optional)</label>
+          <input id="accNumber" placeholder="For future use - add real account number" />
+
+          <label>Account Holder (optional)</label>
+          <input id="accHolder" placeholder="e.g., Hall Authority" />
+
+          <div class="row-actions">
+            <button class="btn primary" id="createAccBtn">Add Account</button>
+            <button class="btn" id="viewAccBtn">View Accounts</button>
+          </div>
+
+          <p class="muted" style="margin-top:10px;">
+            Bank: RUPALI BANK
+          </p>
+        </div> -->
+
+        <!-- Advanced Fee Creation -->
+        <div class="card col-4" id="advancedFees">
+          <h2>Create Fee</h2>
+          
+          <label style="margin-bottom: 6px;">
+            <input type="radio" name="feeType" value="all" checked /> For All Students
+          </label>
+          <label style="margin-bottom: 10px;">
+            <input type="radio" name="feeType" value="single" /> For Single Student
+          </label>
+
+          <div id="singleStudentDiv" style="display:none;">
+            <label>Student ID</label>
+            <input id="feeStudentId" placeholder="e.g., 2203177" />
+          </div>
+
+          <label>Month</label>
+          <input id="advFeeMonth" type="month" />
+
+          <label>Amount (BDT)</label>
+          <input id="advFeeAmount" type="number" min="0" step="1" placeholder="e.g., 500" />
+
+          <div class="row-actions">
+            <button class="btn primary" id="createAdvFeeBtn">Create Fee</button>
+          </div>
         </div>
 
         <!-- Room Inventory -->
@@ -239,19 +289,43 @@
         <!-- Hall dues -->
         <div class="card col-12" id="dues">
           <h2>Hall Dues</h2>
+          <div class="search-box">
+            <input type="text" id="searchDuesStudent" placeholder="Search by Student ID..." />
+            <input type="month" id="searchDuesMonth" placeholder="Search by Month..." />
+            <button class="btn" id="clearDuesSearchBtn">Clear Search</button>
+          </div>
           <table>
             <thead>
               <tr>
-                <th>Student</th>
+                <th>Student ID</th>
+                <th>Student Name</th>
                 <th>Month</th>
                 <th>Amount</th>
                 <th>Status</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody id="duesBody">
-              <tr><td colspan="4" class="muted">Loading…</td></tr>
+              <tr><td colspan="6" class="muted">Loading…</td></tr>
             </tbody>
           </table>
+          
+          <div class="row-actions" style="margin-top: 12px;">
+            <button class="btn" id="deleteSelectedDuesBtn">Remove Selected Student's Fees</button>
+            <button class="btn" id="deleteAllDuesBtn">Remove All Fees for Month</button>
+          </div>
+
+          <div style="margin-top: 12px;">
+            <label>Delete fees for Student ID:</label>
+            <input id="deleteDuesStudentId" placeholder="Enter Student ID" style="flex: 1;" />
+            <button class="btn" id="deleteStudentDuesBtn" style="margin-left: 8px;">Delete</button>
+          </div>
+
+          <div style="margin-top: 12px;">
+            <label>Delete fees for Month:</label>
+            <input id="deleteDuesMonth" type="month" style="flex: 1;" />
+            <button class="btn" id="deleteMonthDuesBtn" style="margin-left: 8px;">Delete</button>
+          </div>
         </div>
       </section>
     </main>
@@ -410,18 +484,92 @@
     function renderDues(dues) {
       const duesBody = $("duesBody");
       if (!dues.length) {
-        duesBody.innerHTML = `<tr><td colspan="4" class="muted">No dues found.</td></tr>`;
+        duesBody.innerHTML = `<tr><td colspan="6" class="muted">No dues found.</td></tr>`;
       } else {
         duesBody.innerHTML = dues.map(d => `
           <tr>
-            <td>${d.student_name || d.student_id}</td>
+            <td>${d.student_id}</td>
+            <td>${d.student_name}</td>
             <td>${d.month}</td>
             <td>${money(d.amount)}</td>
             <td>${badgePaid(d.status)}</td>
+            <td><button class="btn" onclick="deleteSingleDue(${d.id})">Remove</button></td>
+          </tr>
+        `).join("");
+      }
+      allDues = dues;  // Store for search
+    }
+
+    // ===== DELETE SINGLE DUE =====
+    async function deleteSingleDue(dueId) {
+      if (!confirm("Are you sure you want to remove this due?")) {
+        return;
+      }
+
+      try {
+        setStatus("Deleting due...");
+        const res = await fetch(`${API_BASE}/api/hall/dues/${dueId}`, {
+          method: "DELETE"
+        });
+
+        const result = await res.json();
+        
+        if (!res.ok) {
+          setStatus("Error: " + (result.message || "Failed to delete due"));
+          return;
+        }
+
+        setStatus(result.message);
+        setTimeout(() => render(), 500);
+      } catch (err) {
+        setStatus("Error: " + err.message);
+      }
+    }
+
+    // ===== DUES SEARCH =====
+    let allDues = [];
+
+    function filterDues() {
+      const duesBody = $("duesBody");
+      const studentId = $("searchDuesStudent").value.trim().toLowerCase();
+      const month = $("searchDuesMonth").value.trim();
+      
+      if (!studentId && !month) {
+        renderDues(allDues);
+        return;
+      }
+      
+      const filtered = allDues.filter(d => {
+        const studentMatch = d.student_id.toLowerCase().includes(studentId);
+        const monthMatch = !month || d.month === month;
+        return (studentId === '' || studentMatch) && monthMatch;
+      });
+      
+      if (!filtered.length) {
+        duesBody.innerHTML = `<tr><td colspan="6" class="muted">No dues match your search.</td></tr>`;
+      } else {
+        duesBody.innerHTML = filtered.map(d => `
+          <tr>
+            <td>${d.student_id}</td>
+            <td>${d.student_name}</td>
+            <td>${d.month}</td>
+            <td>${money(d.amount)}</td>
+            <td>${badgePaid(d.status)}</td>
+            <td><button class="btn" onclick="deleteSingleDue(${d.id})">Remove</button></td>
           </tr>
         `).join("");
       }
     }
+
+    $("searchDuesStudent").addEventListener("input", filterDues);
+    $("searchDuesMonth").addEventListener("input", filterDues);
+    
+    $("clearDuesSearchBtn").addEventListener("click", () => {
+      $("searchDuesStudent").value = "";
+      $("searchDuesMonth").value = "";
+      filterDues();
+      setStatus("Search cleared");
+    });
 
     // ===== RENDER ROOM INVENTORY =====
     async function renderRooms() {
@@ -656,7 +804,8 @@
       setStatus("Form cleared");
     });
 
-    // ===== CREATE MONTHLY FEE =====
+    // ===== CREATE MONTHLY FEE (DEPRECATED - Replaced by Advanced Fee Creation) =====
+    /* COMMENTED OUT - Use Create Fee (Advanced) instead
     $("createFeeBtn").addEventListener("click", async () => {
       const month = $("feeMonth").value;
       const amount = Number($("feeAmount").value || 0);
@@ -668,14 +817,15 @@
       }
 
       try {
-        setStatus("Creating monthly fee...");
-        const res = await fetch(`${API_BASE}/api/hall/fees/monthly`, {
+        setStatus("Creating monthly fee for all students...");
+        const res = await fetch(`${API_BASE}/api/hall/fees/create-for-all`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             month: month,
             amount: amount,
-            deadline: deadline
+            deadline: deadline,
+            hall_name: hallName
           })
         });
 
@@ -692,6 +842,242 @@
         $("feeDeadline").value = "";
         
         // Refresh dashboard
+        setTimeout(() => render(), 500);
+      } catch (err) {
+        setStatus("Error: " + err.message);
+      }
+    });
+    */
+
+    // ===== ADVANCED FEE CREATION =====
+    document.querySelectorAll('input[name="feeType"]').forEach(radio => {
+      radio.addEventListener("change", () => {
+        const singleDiv = $("singleStudentDiv");
+        if (radio.value === "single") {
+          singleDiv.style.display = "block";
+        } else {
+          singleDiv.style.display = "none";
+        }
+      });
+    });
+
+    $("createAdvFeeBtn").addEventListener("click", async () => {
+      const feeType = document.querySelector('input[name="feeType"]:checked').value;
+      const month = $("advFeeMonth").value;
+      const amount = Number($("advFeeAmount").value || 0);
+
+      if (!month || amount <= 0) {
+        setStatus("Please select Month and enter valid Amount.");
+        return;
+      }
+
+      if (feeType === "single") {
+        const studentId = $("feeStudentId").value.trim();
+        if (!studentId) {
+          setStatus("Please enter Student ID.");
+          return;
+        }
+
+        try {
+          setStatus("Creating fee for single student...");
+          const res = await fetch(`${API_BASE}/api/hall/fees/create-for-student`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              student_id: studentId,
+              month: month,
+              amount: amount,
+              hall_name: hallName
+            })
+          });
+
+          const result = await res.json();
+          
+          if (!res.ok) {
+            setStatus("Error: " + (result.message || "Failed to create fee"));
+            return;
+          }
+
+          setStatus(result.message);
+          $("feeStudentId").value = "";
+          $("advFeeMonth").value = "";
+          $("advFeeAmount").value = "";
+          
+          setTimeout(() => render(), 500);
+        } catch (err) {
+          setStatus("Error: " + err.message);
+        }
+      } else {
+        // Create for all students
+        try {
+          setStatus("Creating fee for all students...");
+          const res = await fetch(`${API_BASE}/api/hall/fees/create-for-all`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              month: month,
+              amount: amount,
+              hall_name: hallName
+            })
+          });
+
+          const result = await res.json();
+          
+          if (!res.ok) {
+            setStatus("Error: " + (result.message || "Failed to create fee"));
+            return;
+          }
+
+          setStatus(result.message);
+          $("advFeeMonth").value = "";
+          $("advFeeAmount").value = "";
+          
+          setTimeout(() => render(), 500);
+        } catch (err) {
+          setStatus("Error: " + err.message);
+        }
+      }
+    });
+
+    // ===== HALL ACCOUNTS (TEMPORARILY DISABLED) =====
+    /* COMMENTED OUT - To be enabled later
+    $("createAccBtn").addEventListener("click", async () => {
+      const accountName = $("accName").value.trim();
+      const accountNumber = $("accNumber").value.trim() || null;
+      const accountHolder = $("accHolder").value.trim() || null;
+
+      if (!accountName) {
+        setStatus("Please enter Account Name.");
+        return;
+      }
+
+      try {
+        setStatus("Creating account...");
+        const res = await fetch(`${API_BASE}/api/hall/accounts`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            account_name: accountName,
+            account_number: accountNumber,
+            account_holder: accountHolder,
+            hall_name: hallName
+          })
+        });
+
+        const result = await res.json();
+        
+        if (!res.ok) {
+          setStatus("Error: " + (result.message || "Failed to create account"));
+          return;
+        }
+
+        setStatus("Account created successfully!");
+        $("accName").value = "";
+        $("accNumber").value = "";
+        $("accHolder").value = "";
+      } catch (err) {
+        setStatus("Error: " + err.message);
+      }
+    });
+
+    $("viewAccBtn").addEventListener("click", async () => {
+      try {
+        setStatus("Loading accounts...");
+        const res = await fetch(`${API_BASE}/api/hall/accounts?hall_name=${encodeURIComponent(hallName)}`);
+        const result = await res.json();
+
+        if (!res.ok) {
+          setStatus("Error: " + (result.message || "Failed to load accounts"));
+          return;
+        }
+
+        const accounts = result.accounts || [];
+        if (accounts.length === 0) {
+          setStatus("No accounts found for this hall.");
+        } else {
+          const accountsList = accounts.map(acc => 
+            `${acc.account_name}${acc.account_number ? ' (' + acc.account_number + ')' : ''}`
+          ).join("\n");
+          alert("Hall Accounts:\n\n" + accountsList);
+        }
+      } catch (err) {
+        setStatus("Error: " + err.message);
+      }
+    });
+    */
+
+    // ===== DELETE ALL DUES FOR STUDENT =====
+    $("deleteStudentDuesBtn").addEventListener("click", async () => {
+      const studentId = $("deleteDuesStudentId").value.trim();
+
+      if (!studentId) {
+        setStatus("Please enter Student ID.");
+        return;
+      }
+
+      if (!confirm(`Remove all fees for student ${studentId}? This action cannot be undone.`)) {
+        return;
+      }
+
+      try {
+        setStatus("Deleting all fees for student...");
+        const res = await fetch(`${API_BASE}/api/hall/dues/delete-all`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            student_id: studentId,
+            hall_name: hallName
+          })
+        });
+
+        const result = await res.json();
+        
+        if (!res.ok) {
+          setStatus("Error: " + (result.message || "Failed to delete fees"));
+          return;
+        }
+
+        setStatus(result.message);
+        $("deleteDuesStudentId").value = "";
+        setTimeout(() => render(), 500);
+      } catch (err) {
+        setStatus("Error: " + err.message);
+      }
+    });
+
+    // ===== DELETE ALL DUES FOR MONTH =====
+    $("deleteMonthDuesBtn").addEventListener("click", async () => {
+      const month = $("deleteDuesMonth").value.trim();
+
+      if (!month) {
+        setStatus("Please select a Month.");
+        return;
+      }
+
+      if (!confirm(`Remove all fees for month ${month}? This action cannot be undone.`)) {
+        return;
+      }
+
+      try {
+        setStatus("Deleting all fees for month...");
+        const res = await fetch(`${API_BASE}/api/hall/dues/delete-all`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            month: month,
+            hall_name: hallName
+          })
+        });
+
+        const result = await res.json();
+        
+        if (!res.ok) {
+          setStatus("Error: " + (result.message || "Failed to delete fees"));
+          return;
+        }
+
+        setStatus(result.message);
+        $("deleteDuesMonth").value = "";
         setTimeout(() => render(), 500);
       } catch (err) {
         setStatus("Error: " + err.message);

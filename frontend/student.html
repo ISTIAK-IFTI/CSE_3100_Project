@@ -138,8 +138,8 @@
         </div>
 
         <div class="card col-7" id="dues">
-          <h2>Current Dues</h2>
-          <div class="muted" style="margin-bottom:8px;">Hall + Department + Registration + Library fines (if any)</div>
+          <h2>Current Dues & Monthly Fees</h2>
+          <div class="muted" style="margin-bottom:8px;">Hall monthly fees + Department + Registration + Library fines (if any)</div>
           <table>
             <thead>
               <tr>
@@ -273,11 +273,31 @@
         // 2) Dues
         // Expected: { items:[{feeType, period, amount, status}] }
         const dues = await api(`/api/student/dues?id=${studentId}`);
+        
+        // Fetch monthly hall fees
+        let monthlyFees = { items: [] };
+        try {
+          monthlyFees = await api(`/api/student/hall-fees?id=${studentId}`);
+        } catch (e) {
+          console.warn("Could not fetch monthly fees:", e.message);
+        }
+        
+        // Combine dues and monthly fees
+        const allDues = dues.items || [];
+        const hallFees = (monthlyFees.items || []).map(f => ({
+          feeType: `Hall Fee (${f.month})`,
+          period: f.month,
+          amount: f.amount,
+          status: f.status
+        }));
+        
+        const combinedDues = [...allDues, ...hallFees];
+        
         const duesBody = $("duesBody");
-        if (!dues.items || dues.items.length === 0) {
+        if (!combinedDues || combinedDues.length === 0) {
           duesBody.innerHTML = `<tr><td colspan="4" class="muted">No dues found.</td></tr>`;
         } else {
-          duesBody.innerHTML = dues.items.map(x => `
+          duesBody.innerHTML = combinedDues.map(x => `
             <tr>
               <td>${x.feeType || "-"}</td>
               <td>${x.period || "-"}</td>
@@ -287,7 +307,7 @@
           `).join("");
         }
 
-        const totalDue = (dues.items || [])
+        const totalDue = combinedDues
           .filter(x => (x.status || "").toLowerCase() !== "paid")
           .reduce((sum, x) => sum + (Number(x.amount) || 0), 0);
         $("totalDue").textContent = money(totalDue);

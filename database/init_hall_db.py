@@ -89,12 +89,29 @@ def init_hall_tables():
     )
     """)
     
+    # Hall Accounts (for payment purposes)
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS hall_accounts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        hall_id INTEGER NOT NULL,
+        account_name TEXT NOT NULL,
+        account_number TEXT,
+        bank_name TEXT DEFAULT 'RUPALI BANK',
+        account_holder TEXT,
+        is_active INTEGER DEFAULT 1,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (hall_id) REFERENCES halls(id)
+    )
+    """)
+    
     # Create indexes
     cur.execute("CREATE INDEX IF NOT EXISTS idx_allocations_hall ON room_allocations(hall_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_allocations_student ON room_allocations(student_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_dues_hall ON hall_dues(hall_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_dues_student ON hall_dues(student_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_dues_month ON hall_dues(month)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_fees_month ON hall_monthly_fees(month)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_accounts_hall ON hall_accounts(hall_id)")
     
     con.commit()
     con.close()
