@@ -249,6 +249,14 @@
       $("modePill").textContent = "Mode: Demo";
     }
 
+    function setDeptTitle(){
+      const deptName = (localStorage.getItem("dept_name") || "Department").toUpperCase();
+      const titleEl = document.querySelector(".title h1");
+      if (titleEl) {
+        titleEl.textContent = `${deptName} Department Fee Management`;
+      }
+    }
+
     // ===== DEMO STATE =====
     const DEMO = {
       students: [
@@ -359,9 +367,12 @@
     $("logoutBtn").addEventListener("click", () => {
       localStorage.removeItem("token");
       localStorage.removeItem("role");
+      localStorage.removeItem("dept_code");
+      localStorage.removeItem("dept_name");
       window.location.href = "login.html";
     });
 
+    setDeptTitle();
     setModePill();
     render();
     setStatus("Loaded.");

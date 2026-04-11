@@ -310,17 +310,6 @@
             </tbody>
           </table>
           
-          <div class="row-actions" style="margin-top: 12px;">
-            <button class="btn" id="deleteSelectedDuesBtn">Remove Selected Student's Fees</button>
-            <button class="btn" id="deleteAllDuesBtn">Remove All Fees for Month</button>
-          </div>
-
-          <div style="margin-top: 12px;">
-            <label>Delete fees for Student ID:</label>
-            <input id="deleteDuesStudentId" placeholder="Enter Student ID" style="flex: 1;" />
-            <button class="btn" id="deleteStudentDuesBtn" style="margin-left: 8px;">Delete</button>
-          </div>
-
           <div style="margin-top: 12px;">
             <label>Delete fees for Month:</label>
             <input id="deleteDuesMonth" type="month" style="flex: 1;" />
@@ -529,45 +518,61 @@
     // ===== DUES SEARCH =====
     let allDues = [];
 
-    function filterDues() {
+    function highlightDuesResults() {
       const duesBody = $("duesBody");
       const studentId = $("searchDuesStudent").value.trim().toLowerCase();
       const month = $("searchDuesMonth").value.trim();
       
+      // If no search filters, show all in original order
       if (!studentId && !month) {
         renderDues(allDues);
         return;
       }
       
-      const filtered = allDues.filter(d => {
+      // Separate matched and non-matched rows
+      const matched = [];
+      const nonMatched = [];
+      
+      allDues.forEach((d) => {
         const studentMatch = d.student_id.toLowerCase().includes(studentId);
         const monthMatch = !month || d.month === month;
-        return (studentId === '' || studentMatch) && monthMatch;
+        
+        if ((studentId === '' || studentMatch) && monthMatch) {
+          matched.push(d);
+        } else {
+          nonMatched.push(d);
+        }
       });
       
-      if (!filtered.length) {
+      // Render matched rows first (with highlight), then non-matched rows
+      const combined = [...matched, ...nonMatched];
+      
+      if (!combined.length) {
         duesBody.innerHTML = `<tr><td colspan="6" class="muted">No dues match your search.</td></tr>`;
       } else {
-        duesBody.innerHTML = filtered.map(d => `
-          <tr>
-            <td>${d.student_id}</td>
-            <td>${d.student_name}</td>
-            <td>${d.month}</td>
-            <td>${money(d.amount)}</td>
-            <td>${badgePaid(d.status)}</td>
-            <td><button class="btn" onclick="deleteSingleDue(${d.id})">Remove</button></td>
-          </tr>
-        `).join("");
+        duesBody.innerHTML = combined.map((d, idx) => {
+          const isMatched = idx < matched.length;
+          return `
+            <tr ${isMatched ? 'class="highlight"' : ''}>
+              <td>${d.student_id}</td>
+              <td>${d.student_name}</td>
+              <td>${d.month}</td>
+              <td>${money(d.amount)}</td>
+              <td>${badgePaid(d.status)}</td>
+              <td><button class="btn" onclick="deleteSingleDue(${d.id})">Remove</button></td>
+            </tr>
+          `;
+        }).join("");
       }
     }
 
-    $("searchDuesStudent").addEventListener("input", filterDues);
-    $("searchDuesMonth").addEventListener("input", filterDues);
+    $("searchDuesStudent").addEventListener("input", highlightDuesResults);
+    $("searchDuesMonth").addEventListener("input", highlightDuesResults);
     
     $("clearDuesSearchBtn").addEventListener("click", () => {
       $("searchDuesStudent").value = "";
       $("searchDuesMonth").value = "";
-      filterDues();
+      renderDues(allDues);  // Restore original order
       setStatus("Search cleared");
     });
 
@@ -1005,45 +1010,6 @@
       }
     });
     */
-
-    // ===== DELETE ALL DUES FOR STUDENT =====
-    $("deleteStudentDuesBtn").addEventListener("click", async () => {
-      const studentId = $("deleteDuesStudentId").value.trim();
-
-      if (!studentId) {
-        setStatus("Please enter Student ID.");
-        return;
-      }
-
-      if (!confirm(`Remove all fees for student ${studentId}? This action cannot be undone.`)) {
-        return;
-      }
-
-      try {
-        setStatus("Deleting all fees for student...");
-        const res = await fetch(`${API_BASE}/api/hall/dues/delete-all`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            student_id: studentId,
-            hall_name: hallName
-          })
-        });
-
-        const result = await res.json();
-        
-        if (!res.ok) {
-          setStatus("Error: " + (result.message || "Failed to delete fees"));
-          return;
-        }
-
-        setStatus(result.message);
-        $("deleteDuesStudentId").value = "";
-        setTimeout(() => render(), 500);
-      } catch (err) {
-        setStatus("Error: " + err.message);
-      }
-    });
 
     // ===== DELETE ALL DUES FOR MONTH =====
     $("deleteMonthDuesBtn").addEventListener("click", async () => {

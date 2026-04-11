@@ -231,10 +231,10 @@ def student_hall_fees():
             hd.status,
             hd.paid_date,
             h.hall_name,
-            ha.account_name
+            pa.account_name
         FROM hall_dues hd
         LEFT JOIN halls h ON hd.hall_id = h.id
-        LEFT JOIN hall_accounts ha ON hd.hall_id = ha.hall_id AND ha.is_active = 1
+        LEFT JOIN payment_accounts pa ON pa.account_type = 'hall' AND pa.entity_identifier = h.hall_name AND pa.is_active = 1
         WHERE hd.student_id = ?
         ORDER BY hd.month DESC
     """, (student_id,))
@@ -538,6 +538,8 @@ def login():
         """, (email,))
         user = cur.fetchone()
         role = "librarian"
+    
+    # ✅ Hall Manager login
     elif email.endswith("@hall.ruet.ac.bd"):
         cur.execute("""
             SELECT email, hall_name, password_hash
@@ -546,6 +548,16 @@ def login():
         """, (email,))
         user = cur.fetchone()
         role = "hall_manager"
+    
+    # ✅ Department Officer login
+    elif email.endswith("@dept.ruet.ac.bd"):
+        cur.execute("""
+            SELECT dept_code, dept_name, password_hash
+            FROM departments
+            WHERE LOWER(email) = LOWER(?)
+        """, (email,))
+        user = cur.fetchone()
+        role = "department_officer"
 
     con.close()
 
@@ -560,13 +572,15 @@ def login():
     if not bcrypt.checkpw(password.encode("utf-8"), stored_hash.encode("utf-8")):
         return jsonify({"message": "Wrong password"}), 401
 
-    # ✅ Return fields
+    # ✅ Return fields based on role
     return jsonify({
         "token": "demo-token",
         "role": role,
         "studentId": user["id"] if role == "student" else None,
         "name": user["name"] if role == "librarian" else None,
         "hall_name": user["hall_name"] if role == "hall_manager" else None,
+        "dept_code": user["dept_code"] if role == "department_officer" else None,
+        "dept_name": user["dept_name"] if role == "department_officer" else None,
     }), 200
 
 
@@ -1327,38 +1341,36 @@ def mark_due_paid(due_id):
 # -------------------------
 @app.route("/api/hall/accounts")
 def get_hall_accounts():
-    """Get all accounts for a hall"""
+    """Get all payment accounts (halls, library, departments)"""
     con = get_db()
     cur = con.cursor()
     
-    hall_name = (request.args.get("hall_name") or "").strip()
+    # Optional filter by account type
+    account_type = (request.args.get("account_type") or "").strip() or None  # 'hall', 'library', 'department'
     
-    if hall_name:
-        cur.execute("SELECT id FROM halls WHERE hall_name = ?", (hall_name,))
-    else:
-        cur.execute("SELECT id FROM halls LIMIT 1")
-    
-    hall_row = cur.fetchone()
-    if not hall_row:
-        con.close()
-        return jsonify({"message": "Hall not found"}), 404
-    
-    hall_id = hall_row["id"]
-    
-    cur.execute("""
+    query = """
         SELECT 
             id,
+            account_type,
+            entity_identifier,
             account_name,
             account_number,
             bank_name,
             account_holder,
             is_active,
             created_at
-        FROM hall_accounts
-        WHERE hall_id = ? AND is_active = 1
-        ORDER BY created_at DESC
-    """, (hall_id,))
+        FROM payment_accounts
+        WHERE is_active = 1
+    """
+    params = []
     
+    if account_type:
+        query += " AND account_type = ?"
+        params.append(account_type)
+    
+    query += " ORDER BY account_type, created_at DESC"
+    
+    cur.execute(query, params)
     rows = cur.fetchall()
     con.close()
     
@@ -1368,46 +1380,68 @@ def get_hall_accounts():
 
 
 # -------------------------
-# HALL: Create account
+# HALL: Create or update payment account
 # -------------------------
 @app.route("/api/hall/accounts", methods=["POST"])
 def create_hall_account():
-    """Create a new hall account"""
+    """Create or update a payment account (hall, library, or department)"""
     data = request.json or {}
+    account_type = (data.get("account_type") or "").strip()  # 'hall', 'library', 'department'
+    entity_identifier = (data.get("entity_identifier") or "").strip()  # hall_name, 'library', or dept_code
     account_name = (data.get("account_name") or "").strip()
     account_number = (data.get("account_number") or "").strip() or None
     bank_name = (data.get("bank_name") or "RUPALI BANK").strip()
     account_holder = (data.get("account_holder") or "").strip() or None
-    hall_name = (data.get("hall_name") or "").strip()
     
-    if not account_name or not hall_name:
-        return jsonify({"message": "account_name and hall_name required"}), 400
+    if not account_type or not entity_identifier or not account_name:
+        return jsonify({"message": "account_type, entity_identifier, and account_name required"}), 400
+    
+    if account_type not in ['hall', 'library', 'department']:
+        return jsonify({"message": "account_type must be 'hall', 'library', or 'department'"}), 400
     
     con = get_db()
     cur = con.cursor()
     
     try:
-        cur.execute("SELECT id FROM halls WHERE hall_name = ?", (hall_name,))
-        hall_row = cur.fetchone()
-        if not hall_row:
-            con.close()
-            return jsonify({"message": f"Hall '{hall_name}' not found"}), 404
-        
-        hall_id = hall_row["id"]
-        
+        # Check if account already exists
         cur.execute("""
-            INSERT INTO hall_accounts (hall_id, account_name, account_number, bank_name, account_holder, is_active)
-            VALUES (?, ?, ?, ?, ?, 1)
-        """, (hall_id, account_name, account_number, bank_name, account_holder))
+            SELECT id FROM payment_accounts 
+            WHERE account_type = ? AND entity_identifier = ?
+        """, (account_type, entity_identifier))
         
-        con.commit()
-        account_id = cur.lastrowid
-        con.close()
+        existing = cur.fetchone()
         
-        return jsonify({
-            "message": "Account created successfully",
-            "account_id": account_id
-        }), 201
+        if existing:
+            # Update existing account
+            account_id = existing["id"]
+            cur.execute("""
+                UPDATE payment_accounts 
+                SET account_name = ?, account_number = ?, bank_name = ?, account_holder = ?
+                WHERE id = ?
+            """, (account_name, account_number, bank_name, account_holder, account_id))
+            con.commit()
+            con.close()
+            
+            return jsonify({
+                "message": "Account updated successfully",
+                "account_id": account_id
+            }), 200
+        else:
+            # Create new account
+            cur.execute("""
+                INSERT INTO payment_accounts 
+                (account_type, entity_identifier, account_name, account_number, bank_name, account_holder, is_active)
+                VALUES (?, ?, ?, ?, ?, ?, 1)
+            """, (account_type, entity_identifier, account_name, account_number, bank_name, account_holder))
+            
+            con.commit()
+            account_id = cur.lastrowid
+            con.close()
+            
+            return jsonify({
+                "message": "Account created successfully",
+                "account_id": account_id
+            }), 201
     
     except Exception as e:
         con.close()

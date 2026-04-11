@@ -52,7 +52,11 @@ def ddl():
     con.row_factory = sqlite3.Row
     cur = con.cursor()
 
-    table_name = "students"
+
+    # cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
+
+
+    table_name = "hall_accounts"
     cur.execute(f"SELECT * FROM {table_name}")
     rows = cur.fetchall()
 
