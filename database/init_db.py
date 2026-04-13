@@ -15,7 +15,7 @@ def dml():
 
     # if True:
     #     studentId = 2203177
-    #     cur.execute(f"delete from students where id = {studentId}")
+    #     cur.execute(f"deleted from students where id = {studentId}")
     #     print(f"id {studentId} delete successfully ✅")
     # cur.execute("update students set verified = 1 where id = 2203177")
     # cur.execute(
@@ -24,8 +24,15 @@ def dml():
     # )
 
     # cur.execute("""
-    # ALTER TABLE halls
-    # RENAME TO hall_managers;
+    #     CREATE TABLE IF NOT EXISTS department_dues (
+    #         dept_id VARCHAR(10), 
+    #         student_id VARCHAR(20), 
+    #         fee_id VARCHAR(10), 
+    #         amount DECIMAL(10, 2) CHECK (amount >= 0),
+    #         status VARCHAR(20) DEFAULT 'unpaid',
+    #         created_at DATE DEFAULT (CURRENT_DATE),
+    #         PRIMARY KEY(dept_id, student_id, fee_id)
+    #     )
     # """)
 
     # cur.execute("""
@@ -53,16 +60,31 @@ def ddl():
     cur = con.cursor()
 
 
+    # {'name': 'books'}
+    # {'name': 'librarians'}
+    # {'name': 'hall_managers'}
+    # {'name': 'halls'}
+    # {'name': 'sqlite_sequence'}
+    # {'name': 'rooms'}
+    # {'name': 'room_allocations'}
+    # {'name': 'hall_monthly_fees'}
+    # {'name': 'hall_dues'}
+    # {'name': 'students'}
+    # {'name': 'hall_accounts'}
+    # {'name': 'payment_accounts'}
+    # {'name': 'departments'}
+    # {'name': 'department_dues'}
+
     # cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
 
 
-    table_name = "hall_accounts"
+    table_name = "department_dues"
     cur.execute(f"SELECT * FROM {table_name}")
     rows = cur.fetchall()
 
     # # execute query
     # cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
-    # # fetch results
+    # # # fetch results
     # tables = cur.fetchall()
     # # print table names
     # print("Tables in database:")

@@ -223,6 +223,9 @@
   </div>
 
   <script>
+    // ====== Config =======
+    const API_BASE = "http://127.0.0.1:5000";
+
     // ===== AUTH GUARD =====
     const token = localStorage.getItem("token");
     const role = (localStorage.getItem("role") || "").toLowerCase();
@@ -274,8 +277,33 @@
       ]
     };
 
-    function render(){
-      $("studentsCount").textContent = String(DEMO.students.length);
+    async function render() {
+      let data = null; 
+      try {
+        const res = await fetch(`${API_BASE}/api/dept/render`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            deptName: localStorage.getItem("dept_name") 
+          })
+        });
+
+        if (!res.ok) throw new Error("Network response was not ok");
+        
+        data = await res.json();
+
+      } catch (err) {
+        console.error(err);
+        document.getElementById("statusText").textContent = "Failed to load summary";
+        return;
+      }
+
+      if (data) {
+        $("studentsCount").textContent = String(data.studentCount || 0);
+      }
+
       $("feesCount").textContent = String(DEMO.fees.length);
 
       const unpaid = DEMO.feeRecords.filter(r => r.status !== "paid").length;
@@ -283,12 +311,12 @@
 
       const totalDue = DEMO.feeRecords
         .filter(r => r.status !== "paid")
-        .reduce((s,r)=> s + (Number(r.amount)||0), 0);
+        .reduce((s, r) => s + (Number(r.amount) || 0), 0);
       $("totalDue").textContent = money(totalDue);
 
-      // Fee list
+      // Fee list রেন্ডারিং
       const feesBody = $("feesBody");
-      if (!DEMO.fees.length){
+      if (!DEMO.fees.length) {
         feesBody.innerHTML = `<tr><td colspan="4" class="muted">No fees created.</td></tr>`;
       } else {
         feesBody.innerHTML = DEMO.fees.map(f => `
@@ -301,9 +329,9 @@
         `).join("");
       }
 
-      // Payment status
+      // Payment status রেন্ডারিং
       const statusBody = $("statusBody");
-      if (!DEMO.feeRecords.length){
+      if (!DEMO.feeRecords.length) {
         statusBody.innerHTML = `<tr><td colspan="5" class="muted">No records found.</td></tr>`;
       } else {
         statusBody.innerHTML = DEMO.feeRecords.map(r => `

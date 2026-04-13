@@ -711,7 +711,8 @@ def return_book():
                 libFee = fine
             else:
                 libFee = row["library_fee"] + fine
-            cur.execute(f"update students set library_fee = {libFee} where id = '{status}'")
+            cur.execute("""UPDATE students SET library_fee = ? WHERE id = ?""", (libFee, status))
+            # cur.execute(f"update students set library_fee = {libFee} where id = '{status}'")
         cur.execute("update books set status = 'available', issue_duration = NULL, issue_date = NULL where id = ?",(bookId,))
         con.commit()
         return jsonify({"message": f"Book returned successfully. Fine: {fine}"})
@@ -1757,6 +1758,28 @@ def search_hall_dues():
         "total": len(dues),
         "dues": dues
     }), 200
+
+
+#  ------------------------------------------
+#         Department SUMMARY RENDR API
+#  ------------------------------------------
+@app.route("/api/dept/render", methods=['POST'])
+def dept_render():
+    data = request.get_json()
+    dept_name = data.get('deptName')
+    
+    con = get_db()
+    cur = con.cursor()
+    
+    cur.execute("SELECT COUNT(id) AS total FROM students WHERE dept=?", (dept_name,))
+    result = cur.fetchone() 
+    
+    con.close()
+
+    return jsonify({
+        "status": "success",
+        "studentCount": result[0]
+    })
 
 
 if __name__ == "__main__":
