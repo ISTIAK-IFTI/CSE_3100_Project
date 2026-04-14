@@ -1773,13 +1773,119 @@ def dept_render():
     
     cur.execute("SELECT COUNT(id) AS total FROM students WHERE dept=?", (dept_name,))
     result = cur.fetchone() 
-    
+    totalStudents = result[0]
+    cur.execute("select count(status) from department_dues where status='unpaid' and dept_id=(select id from departments where dept_name = ?)",(dept_name,))
+    result = cur.fetchone()
+    totalUnpaidRecord = result[0]
+    cur.execute("select sum(amount) from department_dues where status='unpaid' and dept_id=(select id from departments where dept_name = ?)",(dept_name,))
+    result = cur.fetchone()
+    totalDues = result[0]
+    cur.execute("select sum(fee_id) from department_dues where dept_id=(select id from departments where dept_name = ?)",(dept_name,))
+    result = cur.fetchone()
+    totaFeeCreated = result[0]
+    query = """
+        SELECT fee_id, due_type, created_at, amount, status, student_id
+        FROM department_dues 
+        WHERE dept_id = (select id from departments where dept_name = ?)
+    """
+    cur.execute(query, (dept_name,))
+    result = cur.fetchall()
+    info_of_department_dues = []
+    for info in result:
+        info_of_department_dues.append({
+            "fee_id": info[0],
+            "type": info[1],
+            "created_at": str(info[2]), 
+            "amount": float(info[3]),
+            "status": str(info[4]),
+            "student_id": str(info[5])
+        })
     con.close()
 
     return jsonify({
         "status": "success",
-        "studentCount": result[0]
+        "studentCount": str(totalStudents),
+        "unpaidRecords": str(totalUnpaidRecord),
+        "totalDues": str(totalDues),
+        "totaFeeCreated": str(totaFeeCreated)
     })
+
+
+#  ---------------------------------------
+#         Department Fee  API
+#  ---------------------------------------
+@app.route("/api/deptfee", methods=['POST'])
+def dept_fee():
+    data = request.get_json()
+    dept_name = data.get('deptName')
+    mode = data.get('mode')
+    amount = data.get('amount') 
+    type = data.get('type')
+    status = 'unpaid'
+    fee_id = data.get('fee_id')
+    deadline = data.get('deadline')
+    session = data.get('session')
+
+    con = get_db()
+    cur = con.cursor()
+
+    cur.execute("""select id from departments where dept_name = ?""",(dept_name,))
+    dept_id = cur.fetchone()[0]
+
+    if mode == "ids":
+        try:
+            student_ids = data.get('ids', [])
+            format_strings = ','.join(['%s'] * len(student_ids))
+            cur.execute(f"SELECT student_id FROM students WHERE dept = %s AND student_id IN ({format_strings})", 
+                        [dept_name] + student_ids)
+            found_rows = cur.fetchall()
+            found_ids = [row[0] for row in found_rows]
+            not_found = set(student_ids) - set(found_ids)
+            if not_found:
+                return jsonify({
+                    "status": "error",
+                    "message": f"These IDs are invalid or not in {dept_name}: {list(not_found)}"
+                }), 400
+            sql = """
+                INSERT INTO department_dues (dept_id, student_id, fee_id, amount, status, created_at, issue_date, due_type, deadline)
+                VALUES (?, ?, ?, ?, 'unpaid', NOW(), NOW(), ?, ?)
+            """
+            for s_id in student_ids:
+                cur.execute(sql, (dept_id, s_id, fee_id, amount, type, deadline))
+
+            return jsonify({"status": "success", "message": "Fees assigned successfully!"})
+        except Exception as e:
+            con.rollback()
+            return jsonify({"status": "error", "message": str(e)}), 500
+        finally:
+            con.close()
+    elif mode == "session":
+        session_pattern = session + "%"
+        sql = """
+            INSERT INTO department_dues (
+                dept_id, student_id, fee_id, amount, status, 
+                created_at, issue_date, due_type, deadline
+            )
+            SELECT ?, student_id, ?, ?, 'unpaid', NOW(), NOW(), ?, ?
+            FROM students
+            WHERE dept = ? AND student_id LIKE ?
+        """
+        values = (dept_id, fee_id, amount, type, deadline, dept_name, session_pattern)
+        cur.execute(sql, values)
+        return jsonify({"status": "success", "message": "Fees assigned successfully!"})
+    else:
+        sql = '''
+            insert into departments_dues (
+                dept_id, student_id, fee_id, amount, status, 
+                created_at, issue_date, due_type, deadline
+            )
+            select ?, id, ?, ?, 'unpaid', now(), now(), ?, ?
+            from students where dept = ?
+        '''
+        values = (dept_id, fee_id, amount, type, deadline, dept_name)
+        cur.execute(sql, values)
+        con.commit()
+        return jsonify({"status": "success", "message": "Fees assigned successfully!"})
 
 
 if __name__ == "__main__":

@@ -1,1 +1,1 @@
-room_allocations
+studentCount

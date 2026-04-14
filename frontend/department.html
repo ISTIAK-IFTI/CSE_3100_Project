@@ -141,10 +141,10 @@
                 <option value="Other">Other</option>
               </select>
             </div>
-            <div>
+            <!-- <div>
               <label>Semester / Period</label>
               <input id="feePeriod" placeholder="e.g., L-2 T-2 (Spring 2026)" />
-            </div>
+            </div> -->
             <div>
               <label>Amount (BDT)</label>
               <input id="feeAmount" type="number" min="0" step="1" placeholder="e.g., 300" />
@@ -190,7 +190,7 @@
               <tr>
                 <th>Fee ID</th>
                 <th>Type</th>
-                <th>Period</th>
+                <th>Created At</th>
                 <th>Amount</th>
               </tr>
             </thead>
@@ -208,7 +208,7 @@
               <tr>
                 <th>Student ID</th>
                 <th>Fee</th>
-                <th>Period</th>
+                <th>Fee ID</th>
                 <th>Amount</th>
                 <th>Status</th>
               </tr>
@@ -302,47 +302,38 @@
 
       if (data) {
         $("studentsCount").textContent = String(data.studentCount || 0);
-      }
-
-      $("feesCount").textContent = String(DEMO.fees.length);
-
-      const unpaid = DEMO.feeRecords.filter(r => r.status !== "paid").length;
-      $("unpaidCount").textContent = String(unpaid);
-
-      const totalDue = DEMO.feeRecords
-        .filter(r => r.status !== "paid")
-        .reduce((s, r) => s + (Number(r.amount) || 0), 0);
-      $("totalDue").textContent = money(totalDue);
-
-      // Fee list রেন্ডারিং
-      const feesBody = $("feesBody");
-      if (!DEMO.fees.length) {
-        feesBody.innerHTML = `<tr><td colspan="4" class="muted">No fees created.</td></tr>`;
-      } else {
-        feesBody.innerHTML = DEMO.fees.map(f => `
-          <tr>
-            <td>${f.id}</td>
-            <td>${f.type}</td>
-            <td>${f.period}</td>
-            <td>${money(f.amount)}</td>
-          </tr>
-        `).join("");
-      }
-
-      // Payment status রেন্ডারিং
-      const statusBody = $("statusBody");
-      if (!DEMO.feeRecords.length) {
-        statusBody.innerHTML = `<tr><td colspan="5" class="muted">No records found.</td></tr>`;
-      } else {
-        statusBody.innerHTML = DEMO.feeRecords.map(r => `
-          <tr>
-            <td>${r.studentId}</td>
-            <td>${r.type} (${r.feeId})</td>
-            <td>${r.period}</td>
-            <td>${money(r.amount)}</td>
-            <td>${badgePaid(r.status)}</td>
-          </tr>
-        `).join("");
+        $('unpaidCount').textContent = String(data.unpaidRecords || 0);
+        $('totalDue').textContent = String(data.totalDues || 0);
+        $("feesCount").textContent = String(data.totaFeeCreated || 0);
+        const feesBody = $("feesBody");
+        const fees = data.feeDetails;
+        if (!fees || fees.length === 0) {
+            feesBody.innerHTML = `<tr><td colspan="4" class="muted">No fees created.</td></tr>`;
+        } else {
+            feesBody.innerHTML = fees.map(f => `
+              <tr>
+                <td>${f.fee_id}</td>
+                <td>${f.type}</td>
+                <td>${f.created_at}</td>
+                <td>${money(f.amount)}</td>
+              </tr>
+            `).join("");
+        }
+        const statusBody = $("statusBody");
+        if (!fees || fees.length === 0) {
+            statusBody.innerHTML = `<tr><td colspan="4" class="muted">No status found.</td></tr>`;
+        } else {
+            statusBody.innerHTML = fees.map(f => `
+              <tr>
+                <td>${f.student_id}</td>
+                <td>${f.type}</td>
+                <td>${f.fee_id}</td>
+                <td>${money(f.amount)}</td>
+                <td>${badgePaid(f.status)}</td>
+              </tr>
+            `).join("");
+        }
+        
       }
     }
 
@@ -352,44 +343,65 @@
       render();
     });
 
-    $("createFeeBtn").addEventListener("click", () => {
+    $("createFeeBtn").addEventListener("click", async () => {
+      // alert("Clicked!");
       const type = $("feeType").value;
-      const period = $("feePeriod").value.trim();
       const amount = Number($("feeAmount").value || 0);
-
-      if (!period || amount <= 0) {
-        setStatus("Please provide Period and valid Amount.");
+      if (amount <= 0) {
+        alert("Please provide valid Amount.");
         return;
       }
 
-      const newId = "DF-" + (2000 + DEMO.fees.length + 1);
-      DEMO.fees.unshift({ id: newId, type, period, amount });
-
-      // Assign logic
+      const currentCount = Number(data.totaFeeCreated) || 0;
+      const newId = "DF-" + (2000 + currentCount + 1);
+      const deadline = $('feeDeadline').value;
       const mode = $("assignMode").value;
-      let targets = [];
+
+      let ids = [];
+      let session = "";
 
       if (mode === "all") {
-        targets = DEMO.students.map(s => s.id);
+        // no extra data needed
       } else if (mode === "session") {
         const session = $("assignSession").value.trim();
-        if (!session) { setStatus("Please provide a Session."); return; }
-        targets = DEMO.students.filter(s => s.session === session).map(s => s.id);
+        if (!session) { alert("Please provide a Session."); return; }
       } else if (mode === "ids") {
         const ids = $("assignIds").value.trim().split(",").map(x=>x.trim()).filter(Boolean);
-        if (!ids.length) { setStatus("Please provide Student IDs."); return; }
-        targets = ids;
+        if (!ids.length) { alert("Please provide Student IDs."); return; }
       }
-
-      // Create unpaid records for each target
-      targets.forEach(studentId => {
-        DEMO.feeRecords.unshift({
-          studentId, feeId: newId, type, period, amount, status: "unpaid"
-        });
-      });
-
-      setStatus(`Department fee created (Demo) and assigned to ${targets.length} students.`);
-      render();
+      else{
+        alert("Something is wrong in our system. Please forgive us."); 
+        return;
+      }
+      try{
+        const res = await fetch(`${API_BASE}/api/deptfee`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              deptName: localStorage.getItem("dept_name"),
+              mode: mode,
+              amount: amount,
+              type: type,
+              fee_id: newId,
+              ...(deadline && { deadline: deadline }),
+              ...(mode==="ids" && {ids: ids}),
+              ...(mode==="session" && {session: session})
+            })
+          });
+          const result = await res.json();
+          if(result.status === "error"){
+            alert("Error: " + result.message);
+          }else{
+            alert("Seccess!");
+            render();
+          }
+      }catch(err){
+        console.error(err);
+        alert("Failed to connect to server.");
+        return;
+      }
     });
 
     $("logoutBtn").addEventListener("click", () => {

@@ -34,6 +34,11 @@ def dml():
     #         PRIMARY KEY(dept_id, student_id, fee_id)
     #     )
     # """)
+    try:
+        cur.execute("alter table department_dues add column due_type varchar(10)")
+        print("✅ Done")
+    except:
+        print("❌ Not working")
 
     # cur.execute("""
     # insert into halls (email, hall_name, password_hash)
@@ -78,7 +83,7 @@ def ddl():
     # cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
 
 
-    table_name = "department_dues"
+    table_name = "students"
     cur.execute(f"SELECT * FROM {table_name}")
     rows = cur.fetchall()
 
