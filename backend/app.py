@@ -1780,7 +1780,7 @@ def dept_render():
     cur.execute("select sum(amount) from department_dues where status='unpaid' and dept_id=(select id from departments where dept_name = ?)",(dept_name,))
     result = cur.fetchone()
     totalDues = result[0]
-    cur.execute("select sum(fee_id) from department_dues where dept_id=(select id from departments where dept_name = ?)",(dept_name,))
+    cur.execute("select count(distinct fee_id) from department_dues where dept_id=(select id from departments where dept_name = ?)",(dept_name,))
     result = cur.fetchone()
     totaFeeCreated = result[0]
     query = """
@@ -1807,7 +1807,8 @@ def dept_render():
         "studentCount": str(totalStudents),
         "unpaidRecords": str(totalUnpaidRecord),
         "totalDues": str(totalDues),
-        "totaFeeCreated": str(totaFeeCreated)
+        "totaFeeCreated": str(totaFeeCreated),
+        "feeDetails": info_of_department_dues
     })
 
 
@@ -1835,8 +1836,8 @@ def dept_fee():
     if mode == "ids":
         try:
             student_ids = data.get('ids', [])
-            format_strings = ','.join(['%s'] * len(student_ids))
-            cur.execute(f"SELECT student_id FROM students WHERE dept = %s AND student_id IN ({format_strings})", 
+            placeholders = ','.join(['?' for _ in student_ids])
+            cur.execute(f"SELECT student_id FROM students WHERE dept = ? AND student_id IN ({placeholders})", 
                         [dept_name] + student_ids)
             found_rows = cur.fetchall()
             found_ids = [row[0] for row in found_rows]
@@ -1847,8 +1848,8 @@ def dept_fee():
                     "message": f"These IDs are invalid or not in {dept_name}: {list(not_found)}"
                 }), 400
             sql = """
-                INSERT INTO department_dues (dept_id, student_id, fee_id, amount, status, created_at, issue_date, due_type, deadline)
-                VALUES (?, ?, ?, ?, 'unpaid', NOW(), NOW(), ?, ?)
+                INSERT INTO department_dues (dept_id, student_id, fee_id, amount, status, created_at, due_type, deadline)
+                VALUES (?, ?, ?, ?, 'unpaid', CURRENT_TIMESTAMP, ?, ?)
             """
             for s_id in student_ids:
                 cur.execute(sql, (dept_id, s_id, fee_id, amount, type, deadline))
@@ -1864,27 +1865,30 @@ def dept_fee():
         sql = """
             INSERT INTO department_dues (
                 dept_id, student_id, fee_id, amount, status, 
-                created_at, issue_date, due_type, deadline
+                created_at, due_type, deadline
             )
-            SELECT ?, student_id, ?, ?, 'unpaid', NOW(), NOW(), ?, ?
+            SELECT ?, student_id, ?, ?, 'unpaid', CURRENT_TIMESTAMP, ?, ?
             FROM students
             WHERE dept = ? AND student_id LIKE ?
         """
         values = (dept_id, fee_id, amount, type, deadline, dept_name, session_pattern)
         cur.execute(sql, values)
+        con.commit()
+        con.close()
         return jsonify({"status": "success", "message": "Fees assigned successfully!"})
     else:
         sql = '''
-            insert into departments_dues (
+            insert into department_dues (
                 dept_id, student_id, fee_id, amount, status, 
-                created_at, issue_date, due_type, deadline
+                created_at, due_type, deadline
             )
-            select ?, id, ?, ?, 'unpaid', now(), now(), ?, ?
+            select ?, id, ?, ?, 'unpaid', CURRENT_TIMESTAMP, ?, ?
             from students where dept = ?
         '''
         values = (dept_id, fee_id, amount, type, deadline, dept_name)
         cur.execute(sql, values)
         con.commit()
+        con.close()
         return jsonify({"status": "success", "message": "Fees assigned successfully!"})
 
 

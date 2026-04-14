@@ -261,6 +261,7 @@
     }
 
     // ===== DEMO STATE =====
+    let apiData = null;
     const DEMO = {
       students: [
         { id: "2203177", session: "22" },
@@ -278,7 +279,6 @@
     };
 
     async function render() {
-      let data = null; 
       try {
         const res = await fetch(`${API_BASE}/api/dept/render`, {
           method: 'POST',
@@ -292,7 +292,7 @@
 
         if (!res.ok) throw new Error("Network response was not ok");
         
-        data = await res.json();
+        apiData = await res.json();
 
       } catch (err) {
         console.error(err);
@@ -300,13 +300,13 @@
         return;
       }
 
-      if (data) {
-        $("studentsCount").textContent = String(data.studentCount || 0);
-        $('unpaidCount').textContent = String(data.unpaidRecords || 0);
-        $('totalDue').textContent = String(data.totalDues || 0);
-        $("feesCount").textContent = String(data.totaFeeCreated || 0);
+      if (apiData) {
+        $("studentsCount").textContent = String(apiData.studentCount || 0);
+        $('unpaidCount').textContent = String(apiData.unpaidRecords || 0);
+        $('totalDue').textContent = String(apiData.totalDues || 0);
+        $("feesCount").textContent = String(apiData.totaFeeCreated || 0);
         const feesBody = $("feesBody");
-        const fees = data.feeDetails;
+        const fees = apiData.feeDetails;
         if (!fees || fees.length === 0) {
             feesBody.innerHTML = `<tr><td colspan="4" class="muted">No fees created.</td></tr>`;
         } else {
@@ -321,7 +321,7 @@
         }
         const statusBody = $("statusBody");
         if (!fees || fees.length === 0) {
-            statusBody.innerHTML = `<tr><td colspan="4" class="muted">No status found.</td></tr>`;
+            statusBody.innerHTML = `<tr><td colspan="5" class="muted">No status found.</td></tr>`;
         } else {
             statusBody.innerHTML = fees.map(f => `
               <tr>
@@ -352,7 +352,7 @@
         return;
       }
 
-      const currentCount = Number(data.totaFeeCreated) || 0;
+      const currentCount = Number((apiData && apiData.totaFeeCreated) || 0);
       const newId = "DF-" + (2000 + currentCount + 1);
       const deadline = $('feeDeadline').value;
       const mode = $("assignMode").value;
@@ -363,10 +363,10 @@
       if (mode === "all") {
         // no extra data needed
       } else if (mode === "session") {
-        const session = $("assignSession").value.trim();
+        session = $("assignSession").value.trim();
         if (!session) { alert("Please provide a Session."); return; }
       } else if (mode === "ids") {
-        const ids = $("assignIds").value.trim().split(",").map(x=>x.trim()).filter(Boolean);
+        ids = $("assignIds").value.trim().split(",").map(x=>x.trim()).filter(Boolean);
         if (!ids.length) { alert("Please provide Student IDs."); return; }
       }
       else{

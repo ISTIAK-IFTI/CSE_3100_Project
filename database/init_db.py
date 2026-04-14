@@ -35,7 +35,7 @@ def dml():
     #     )
     # """)
     try:
-        cur.execute("alter table department_dues add column due_type varchar(10)")
+        cur.execute("alter table department_dues add column deadline date")
         print("✅ Done")
     except:
         print("❌ Not working")
@@ -53,6 +53,36 @@ def dml():
 
     print("✅")
 
+
+def get_table_columns(table_name):
+    import sqlite3
+    from pathlib import Path
+
+    db_path = Path(__file__).parent / "ruet.db"
+
+    con = sqlite3.connect(db_path)
+    con.row_factory = sqlite3.Row
+    cur = con.cursor()
+    try:
+        # টেবিল খালি থাকলেও এটি কলামের লিস্ট দিবে
+        cur.execute(f"PRAGMA table_info({table_name})")
+        
+        columns = cur.fetchall()
+        
+        print(f"--- Columns in '{table_name}' ---")
+        column_names = []
+        for col in columns:
+            # col[0] = Field Name, col[1] = Type, col[2] = Null, col[3] = Key
+            print(f"Field: {col[0]} | Type: {col[1]} | Null: {col[2]}")
+            column_names.append(col[0])
+            
+        return column_names
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return None
+    finally:
+        con.close()
 
 def ddl():
     import sqlite3
@@ -108,4 +138,5 @@ def ddl():
 
 
 # dml()
-ddl()
+# ddl()
+get_table_columns('department_dues')
