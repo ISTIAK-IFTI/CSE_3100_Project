@@ -113,7 +113,7 @@ def ddl():
     # cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
 
 
-    table_name = "students"
+    table_name = "payment_accounts"
     cur.execute(f"SELECT * FROM {table_name}")
     rows = cur.fetchall()
 
@@ -138,5 +138,5 @@ def ddl():
 
 
 # dml()
-# ddl()
-get_table_columns('department_dues')
+ddl()
+# get_table_columns('department_dues')

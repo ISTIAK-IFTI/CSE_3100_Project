@@ -343,7 +343,7 @@
   // =========================
   // 3) RENDER FUNCTION
   // =========================
-  function renderStudent(data, monthlyFees = []) {
+  function renderStudent(data, monthlyFees = [], libraryAccount = null, departmentDues = []) {
     elName.textContent = data?.name ?? "—";
     elStudentId.textContent = data?.studentId ?? "—";
     elDept.textContent = data?.dept ?? "—";
@@ -358,10 +358,23 @@
     let items = data?.due?.items ?? [];
     items = items.filter(item => item.title !== "Hall Fee");
     
-    // Add account info to old dues (Library Fine, Department Fee don't have specific accounts)
-    items = items.map(item => ({
-      ...item,
-      account: "—"
+    // Add account info to old dues
+    items = items.map(item => {
+      let account = "—";
+      if (item.title === "Library Fine" && libraryAccount) {
+        account = libraryAccount.account_name || "—";
+      }
+      return {
+        ...item,
+        account: account
+      };
+    });
+    
+    // Department dues
+    const departmentFeesItems = (departmentDues || []).map(d => ({
+      title: `Dept Fee: ${d.fee_type} ${d.fee_id}`,
+      amount: d.amount,
+      account: d.account_name || "—"
     }));
     
     // Monthly fees with hall account names
@@ -371,7 +384,7 @@
       account: f.account_name || "—"
     }));
     
-    const allItems = [...items, ...monthlyFeesItems];
+    const allItems = [...items, ...departmentFeesItems, ...monthlyFeesItems];
 
     // Calculate total due (including monthly fees)
     const total = allItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
@@ -435,7 +448,42 @@
         console.warn("Error fetching monthly hall fees:", err.message);
       }
 
-      renderStudent(data, monthlyFees);
+      // Fetch library account information
+      let libraryAccount = null;
+      try {
+        console.log("Fetching library account from:", `${API_BASE}/api/hall/accounts?account_type=library`);
+        const libAccRes = await fetch(`${API_BASE}/api/hall/accounts?account_type=library`);
+        if (libAccRes.ok) {
+          const libAccData = await libAccRes.json();
+          const accounts = libAccData.accounts || [];
+          if (accounts.length > 0) {
+            libraryAccount = accounts[0];
+            console.log("Library account:", libraryAccount);
+          }
+        } else {
+          console.warn("Could not fetch library account:", libAccRes.status);
+        }
+      } catch (err) {
+        console.warn("Error fetching library account:", err.message);
+      }
+
+      // Fetch department dues
+      let departmentDues = [];
+      try {
+        console.log("Fetching department dues from:", `${API_BASE}/api/student/department-dues?id=${studentId}`);
+        const deptDuesRes = await fetch(`${API_BASE}/api/student/department-dues?id=${studentId}`);
+        if (deptDuesRes.ok) {
+          const deptDuesData = await deptDuesRes.json();
+          departmentDues = deptDuesData.items || [];
+          console.log("Department dues:", departmentDues);
+        } else {
+          console.warn("Could not fetch department dues:", deptDuesRes.status);
+        }
+      } catch (err) {
+        console.warn("Error fetching department dues:", err.message);
+      }
+
+      renderStudent(data, monthlyFees, libraryAccount, departmentDues);
       showMsg("Loaded from database ✅", "ok");
 
     } catch (err) {

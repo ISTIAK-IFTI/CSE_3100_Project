@@ -262,6 +262,108 @@ def student_hall_fees():
 
 
 # -------------------------
+# STUDENT: Get Department Dues
+# -------------------------
+@app.route("/api/student/department-dues")
+def student_department_dues():
+    """Get all department dues for a student"""
+    student_id = request.args.get("id") or request.headers.get("X-Student-Id")
+    
+    if not student_id:
+        return jsonify({"message": "Student ID not provided"}), 400
+    
+    con = get_db()
+    cur = con.cursor()
+    
+    # Fetch department dues with department account info
+    cur.execute("""
+        SELECT 
+            dd.fee_id,
+            dd.due_type,
+            dd.amount,
+            dd.status,
+            dd.deadline,
+            dd.created_at,
+            d.dept_name,
+            pa.account_name
+        FROM department_dues dd
+        JOIN departments d ON dd.dept_id = d.id
+        LEFT JOIN payment_accounts pa ON pa.account_type = 'department' AND pa.entity_identifier = d.dept_code AND pa.is_active = 1
+        WHERE dd.student_id = ?
+        ORDER BY dd.created_at DESC
+    """, (student_id,))
+    
+    rows = cur.fetchall()
+    con.close()
+    
+    if not rows:
+        return jsonify({"items": []}), 200
+    
+    items = [
+        {
+            "fee_id": row["fee_id"],
+            "fee_type": row["due_type"],
+            "amount": int(row["amount"] or 0),
+            "status": row["status"],
+            "deadline": row["deadline"],
+            "created_at": row["created_at"],
+            "dept_name": row["dept_name"],
+            "account_name": row["account_name"]
+        }
+        for row in rows
+    ]
+    
+    return jsonify({"items": items}), 200
+def student_hall_fees():
+    """Get monthly hall fees for currently logged-in student with hall and account info"""
+    student_id = request.args.get("id") or request.headers.get("X-Student-Id")
+    
+    if not student_id:
+        return jsonify({"message": "Student ID not provided"}), 400
+    
+    con = get_db()
+    cur = con.cursor()
+    
+    # Fetch monthly fees from hall_dues with hall and account info
+    cur.execute("""
+        SELECT 
+            hd.id,
+            hd.month,
+            hd.amount,
+            hd.status,
+            hd.paid_date,
+            h.hall_name,
+            pa.account_name
+        FROM hall_dues hd
+        LEFT JOIN halls h ON hd.hall_id = h.id
+        LEFT JOIN payment_accounts pa ON pa.account_type = 'hall' AND pa.entity_identifier = h.hall_name AND pa.is_active = 1
+        WHERE hd.student_id = ?
+        ORDER BY hd.month DESC
+    """, (student_id,))
+    
+    rows = cur.fetchall()
+    con.close()
+    
+    if not rows:
+        return jsonify({"items": []}), 200
+    
+    items = [
+        {
+            "id": row["id"],
+            "month": row["month"],
+            "amount": int(row["amount"] or 0),
+            "status": row["status"],
+            "paid_date": row["paid_date"],
+            "hall_name": row["hall_name"],
+            "account_name": row["account_name"]
+        }
+        for row in rows
+    ]
+    
+    return jsonify({"items": items}), 200
+
+
+# -------------------------
 # STUDENT: Get Payment History
 # -------------------------
 @app.route("/api/student/payments")
