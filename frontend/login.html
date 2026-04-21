@@ -19,6 +19,20 @@
         justify-content:center;
         padding:20px;
         background: rgba(0,0,0,0.35);
+        overflow-y: auto;
+    }
+    @media (max-width: 520px) {
+      .wrap {
+        padding: 16px;
+      }
+      input {
+        font-size: 16px !important;
+      }
+      button {
+        padding: 14px;
+        font-size: 16px;
+        min-height: 48px;
+      }
     }
     /* login box background image */
     .card{
@@ -78,27 +92,48 @@
       color: white; 
       font-size: 15px; 
       cursor: pointer; 
+      transition: all 0.2s ease;
+      touch-action: manipulation;
+    }
+    button:hover {
+      background: #1f2937;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+    button:active {
+      transform: translateY(0px);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
     }
     button:disabled { 
       opacity: .6; 
       cursor: not-allowed; 
+      transform: none;
     }
     .registerButton{
       width: 100%;
       margin-top: 12px;
-      padding: 10px;
+      padding: 12px;
       border-radius: 10px;
       border: 1px solid #ddd;
-      background: black;
+      background: white;
       cursor: pointer;
       font-size: 14px;
-      transition: 0.2s;
+      transition: all 0.2s ease;
+      touch-action: manipulation;
+      color: #111827;
     }
     .registerButton:hover{
-      background: red;
+      background: #f3f4f6;
+      border-color: #111827;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    .registerButton:active {
+      transform: translateY(0px);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
     }
     #btn:hover {
-      background: #73e859;  /* slightly lighter */
+      background: #1f2937;
     }
     .msg { 
       margin-top: 12px; 
