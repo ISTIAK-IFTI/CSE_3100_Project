@@ -356,7 +356,7 @@
 
     // Old dues (filter out "Hall Fee" since we now show monthly fees separately)
     let items = data?.due?.items ?? [];
-    items = items.filter(item => item.title !== "Hall Fee");
+    items = items.filter(item => item.title !== "Hall Fee" && item.title !== "Department Fee");
     
     // Add account info to old dues
     items = items.map(item => {

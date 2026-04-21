@@ -55,6 +55,9 @@ def dml():
 
 
 def get_table_columns(table_name):
+
+    print("\n", "Table Name : ", table_name, "\n")
+
     import sqlite3
     from pathlib import Path
 
@@ -84,7 +87,11 @@ def get_table_columns(table_name):
     finally:
         con.close()
 
-def ddl():
+
+def show_table_info(table_name):
+
+    print("\n", "Table Name : ", table_name, "\n")
+
     import sqlite3
     from pathlib import Path
 
@@ -112,8 +119,6 @@ def ddl():
 
     # cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
 
-
-    table_name = "payment_accounts"
     cur.execute(f"SELECT * FROM {table_name}")
     rows = cur.fetchall()
 
@@ -138,5 +143,5 @@ def ddl():
 
 
 # dml()
-ddl()
+show_table_info('department_dues')
 # get_table_columns('department_dues')
