@@ -98,6 +98,9 @@
     .ok{background:#ecfdf5;border-color:#a7f3d0}
     .bad{background:#fef2f2;border-color:#fecaca}
     .muted{color:var(--muted);font-size:12px}
+    .highlight{background:#fef3c7 !important}
+    .search-box{display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+    .search-box input{flex:1;min-width:200px;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:12px}
 
     .col-12{grid-column:span 12}
     .col-8{grid-column:span 8}
@@ -251,6 +254,10 @@
         <!-- Payment status table -->
         <div class="card col-12" id="status">
           <h2>Student Payment Status</h2>
+          <div class="search-box">
+            <input type="text" id="searchStatusStudent" placeholder="Search by Student ID..." />
+            <button class="btn" id="clearStatusSearchBtn">Clear Search</button>
+          </div>
           <table>
             <thead>
               <tr>
@@ -310,6 +317,7 @@
 
     // ===== DEMO STATE =====
     let apiData = null;
+    let allStatusRecords = [];  // Store all status records for search
     const DEMO = {
       students: [
         { id: "2203177", session: "22" },
@@ -371,19 +379,82 @@
         if (!fees || fees.length === 0) {
             statusBody.innerHTML = `<tr><td colspan="5" class="muted">No status found.</td></tr>`;
         } else {
-            statusBody.innerHTML = fees.map(f => `
-              <tr>
-                <td>${f.student_id}</td>
-                <td>${f.type}</td>
-                <td>${f.fee_id}</td>
-                <td>${money(f.amount)}</td>
-                <td>${badgePaid(f.status)}</td>
-              </tr>
-            `).join("");
+            allStatusRecords = fees;  // Store for search
+            renderStatusTable(fees);
         }
         
       }
     }
+
+    // ===== RENDER STATUS TABLE =====
+    function renderStatusTable(records) {
+      const statusBody = $("statusBody");
+      if (!records || records.length === 0) {
+        statusBody.innerHTML = `<tr><td colspan="5" class="muted">No status found.</td></tr>`;
+      } else {
+        statusBody.innerHTML = records.map(f => `
+          <tr>
+            <td>${f.student_id}</td>
+            <td>${f.type}</td>
+            <td>${f.fee_id}</td>
+            <td>${money(f.amount)}</td>
+            <td>${badgePaid(f.status)}</td>
+          </tr>
+        `).join("");
+      }
+    }
+
+    // ===== STATUS SEARCH =====
+    function highlightStatusResults() {
+      const studentId = $("searchStatusStudent").value.trim().toLowerCase();
+      
+      // If no search filter, show all in original order
+      if (!studentId) {
+        renderStatusTable(allStatusRecords);
+        return;
+      }
+      
+      // Separate matched and non-matched records
+      const matched = [];
+      const nonMatched = [];
+      
+      allStatusRecords.forEach((record) => {
+        if (record.student_id.toLowerCase().includes(studentId)) {
+          matched.push(record);
+        } else {
+          nonMatched.push(record);
+        }
+      });
+      
+      // Render matched records first (with highlight), then non-matched records
+      const combined = [...matched, ...nonMatched];
+      
+      const statusBody = $("statusBody");
+      if (!combined.length) {
+        statusBody.innerHTML = `<tr><td colspan="5" class="muted">No student payment status matches your search.</td></tr>`;
+      } else {
+        statusBody.innerHTML = combined.map((f, idx) => {
+          const isMatched = idx < matched.length;
+          return `
+            <tr ${isMatched ? 'class="highlight"' : ''}>
+              <td>${f.student_id}</td>
+              <td>${f.type}</td>
+              <td>${f.fee_id}</td>
+              <td>${money(f.amount)}</td>
+              <td>${badgePaid(f.status)}</td>
+            </tr>
+          `;
+        }).join("");
+      }
+    }
+
+    $("searchStatusStudent").addEventListener("input", highlightStatusResults);
+    
+    $("clearStatusSearchBtn").addEventListener("click", () => {
+      $("searchStatusStudent").value = "";
+      renderStatusTable(allStatusRecords);  // Restore original order
+      setStatus("Search cleared");
+    });
 
     // ===== ACTIONS =====
     $("refreshBtn").addEventListener("click", () => {

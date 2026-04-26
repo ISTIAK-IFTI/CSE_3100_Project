@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Payment - RUET Portal</title>
+
+  <style>
+    :root{
+      --bg:#f5f6f8; --card:#fff; --text:#111827; --muted:#6b7280;
+      --border:#e5e7eb; --dark:#111827; --success:#10b981; --danger:#ef4444;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Arial, sans-serif;background:var(--bg);color:var(--text)}
+    
+    .layout{display:flex;min-height:100vh;align-items:center;justify-content:center;padding:20px}
+    .container{max-width:600px;width:100%;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:30px;box-shadow:0 1px 3px rgba(0,0,0,0.1)}
+    
+    .header{text-align:center;margin-bottom:30px}
+    .header h1{margin:0;font-size:24px;font-weight:700}
+    .header p{margin:8px 0 0;color:var(--muted);font-size:14px}
+    
+    .section{margin-bottom:24px}
+    .section h2{margin:0 0 16px;font-size:14px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px}
+    
+    .invoice{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px}
+    .invoice-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+    .invoice-row:last-child{margin-bottom:0;padding-bottom:0;border-bottom:none}
+    .invoice-row .label{color:var(--muted);font-size:13px;font-weight:500}
+    .invoice-row .value{font-weight:600;font-size:14px}
+    
+    .total-row{padding:12px 0;margin-top:12px;border-top:2px solid var(--border)}
+    .total-row .label{font-size:14px;font-weight:700}
+    .total-row .value{font-size:20px;font-weight:700;color:var(--danger)}
+    
+    .account-info{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px}
+    .account-info h3{margin:0 0 12px;font-size:13px;font-weight:700;color:var(--muted)}
+    .account-detail{display:flex;justify-content:space-between;margin-bottom:10px;font-size:13px}
+    .account-detail:last-child{margin-bottom:0}
+    .account-detail .label{color:var(--muted);font-weight:500}
+    .account-detail .value{font-weight:600}
+    
+    .form-group{margin-bottom:16px}
+    .form-group label{display:block;margin-bottom:6px;font-size:13px;font-weight:600;color:var(--text)}
+    .form-group input,.form-group select{width:100%;padding:12px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit}
+    .form-group input:focus,.form-group select:focus{outline:none;border-color:var(--dark);box-shadow:0 0 0 3px rgba(17,24,39,0.1)}
+    
+    .btn{
+      width:100%;border:none;border-radius:10px;padding:12px;cursor:pointer;font-weight:600;font-size:14px;transition:all 0.2s ease;touch-action:manipulation;min-height:44px;
+    }
+    .btn.primary{background:var(--success);color:#fff;border:1px solid var(--success)}
+    .btn.primary:hover{background:#059669;transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,0.15)}
+    .btn.primary:active{transform:translateY(0px);box-shadow:0 2px 6px rgba(0,0,0,0.1)}
+    .btn.secondary{background:#fff;color:var(--text);border:1px solid var(--border)}
+    .btn.secondary:hover{background:var(--bg);border-color:var(--text);transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,0.1)}
+    .btn:disabled{opacity:0.6;cursor:not-allowed;transform:none !important}
+    
+    .actions{display:flex;gap:12px;margin-top:24px}
+    .actions .btn{flex:1}
+    
+    .status{padding:12px;border-radius:8px;margin-bottom:16px;font-size:13px;font-weight:600;display:none}
+    .status.success{background:#ecfdf5;color:#065f46;border-left:4px solid var(--success)}
+    .status.error{background:#fef2f2;color:#7f1d1d;border-left:4px solid var(--danger)}
+    .status.info{background:#eff6ff;color:#0c2340;border-left:4px solid #3b82f6}
+    .status.show{display:block}
+    
+    .method-selector{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:16px}
+    .method-option{position:relative}
+    .method-option input[type="radio"]{display:none}
+    .method-label{display:flex;align-items:center;justify-content:center;padding:16px;border:2px solid var(--border);border-radius:10px;cursor:pointer;font-weight:600;font-size:13px;transition:all 0.2s ease}
+    .method-option input[type="radio"]:checked + .method-label{border-color:var(--success);background:rgba(16,185,129,0.1)}
+    
+    .back-link{display:inline-flex;align-items:center;gap:6px;color:var(--muted);text-decoration:none;font-size:13px;font-weight:600;margin-bottom:20px;transition:color 0.2s ease}
+    .back-link:hover{color:var(--text)}
+    
+    @media (max-width:520px){
+      .container{padding:20px}
+      .header h1{font-size:20px}
+      .method-selector{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+
+<body>
+  <div class="layout">
+    <div class="container">
+      <a href="javascript:history.back()" class="back-link">← Go Back</a>
+
+      <div class="header">
+        <h1>Payment Details</h1>
+        <p id="headerSubtitle">Complete your payment</p>
+      </div>
+
+      <div id="statusMsg" class="status"></div>
+
+      <!-- DUE DETAILS SECTION -->
+      <div class="section">
+        <h2>Due Information</h2>
+        <div class="invoice">
+          <div class="invoice-row">
+            <span class="label">Fee Type</span>
+            <span class="value" id="feeType">—</span>
+          </div>
+          <div class="invoice-row">
+            <span class="label">Description</span>
+            <span class="value" id="feeDesc">—</span>
+          </div>
+          <div class="invoice-row">
+            <span class="label">Status</span>
+            <span class="value" id="feeStatus">—</span>
+          </div>
+          <div class="invoice-row">
+            <span class="label">Due Date</span>
+            <span class="value" id="dueDate">—</span>
+          </div>
+          <div class="invoice-row total-row">
+            <span class="label">Amount Due</span>
+            <span class="value" id="amount">0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ACCOUNT DETAILS SECTION -->
+      <div id="accountSection" style="display:none">
+        <div class="section">
+          <h2>Payment Account</h2>
+          <div class="account-info">
+            <h3 id="accountType">Account Details</h3>
+            <div class="account-detail">
+              <span class="label">Account Name</span>
+              <span class="value" id="accountName">—</span>
+            </div>
+            <div class="account-detail">
+              <span class="label">Account Number</span>
+              <span class="value" id="accountNumber">—</span>
+            </div>
+            <div class="account-detail">
+              <span class="label">Bank Name</span>
+              <span class="value" id="bankName">—</span>
+            </div>
+            <div class="account-detail">
+              <span class="label">Account Holder</span>
+              <span class="value" id="accountHolder">—</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PAYMENT METHOD SECTION -->
+      <form id="paymentForm">
+        <div class="section">
+          <h2>Payment Method</h2>
+          <div class="method-selector">
+            <div class="method-option">
+              <input type="radio" id="methodBank" name="paymentMethod" value="bank" checked />
+              <label for="methodBank" class="method-label">🏦 Bank Transfer</label>
+            </div>
+            <div class="method-option">
+              <input type="radio" id="methodMobile" name="paymentMethod" value="mobile" />
+              <label for="methodMobile" class="method-label">📱 Mobile Banking</label>
+            </div>
+          </div>
+        </div>
+
+        <!-- TRANSACTION REFERENCE -->
+        <div class="section">
+          <h2>Transaction Reference</h2>
+          <div class="form-group">
+            <label for="txnRef">Transaction Reference Number *</label>
+            <input type="text" id="txnRef" name="txnRef" placeholder="e.g., CHK123456 or bKash Reference" required />
+          </div>
+          <div class="form-group">
+            <label for="txnDate">Transaction Date *</label>
+            <input type="date" id="txnDate" name="txnDate" required />
+          </div>
+        </div>
+
+        <!-- ACTION BUTTONS -->
+        <div class="actions">
+          <button type="button" class="btn secondary" id="cancelBtn">Cancel</button>
+          <button type="submit" class="btn primary" id="payBtn">Pay Now</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = "http://localhost:5000";
+
+    // ===== HELPERS =====
+    const $ = (id) => document.getElementById(id);
+    function money(n){ return (Number(n)||0).toFixed(0); }
+
+    function showStatus(text, type = "info"){
+      const statusEl = $("statusMsg");
+      statusEl.textContent = text;
+      statusEl.className = `status ${type} show`;
+      setTimeout(() => statusEl.classList.remove("show"), 5000);
+    }
+
+    async function api(path, options = {}) {
+      const res = await fetch(`${API_BASE}${path}`, {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          ...(options.headers || {})
+        }
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || "Request failed");
+      return data;
+    }
+
+    // ===== GET DUE DETAILS FROM URL PARAMS =====
+    async function loadPaymentDetails(){
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const dueType = params.get("type");  // 'hall', 'department', 'library'
+        const dueId = params.get("id");      // due ID or fee_id
+        const studentId = localStorage.getItem("studentId");
+
+        if (!dueType || !dueId || !studentId) {
+          showStatus("Missing payment details. Please go back and try again.", "error");
+          return;
+        }
+
+        let dueDetails = {};
+
+        // Fetch due details based on type
+        if (dueType === "hall") {
+          const dues = await api(`/api/student/hall-fees?id=${studentId}`);
+          dueDetails = dues.items?.find(d => d.id == dueId);
+          if (dueDetails) {
+            $("feeType").textContent = `Hall Fee`;
+            $("feeDesc").textContent = `Monthly hall accommodation for ${dueDetails.month}`;
+            $("dueDate").textContent = dueDetails.month || "—";
+            $("accountName").textContent = dueDetails.account_name || "RUET Hall Account";
+            $("accountSection").style.display = "block";
+          }
+        } else if (dueType === "department") {
+          const dues = await api(`/api/student/department-dues?id=${studentId}`);
+          dueDetails = dues.items?.find(d => d.fee_id == dueId);
+          if (dueDetails) {
+            $("feeType").textContent = dueDetails.fee_type || "Department Fee";
+            $("feeDesc").textContent = `${dueDetails.dept_name} - ${dueDetails.fee_type}`;
+            $("dueDate").textContent = dueDetails.deadline || "—";
+            $("accountName").textContent = dueDetails.account_name || "RUET Department Account";
+            $("accountSection").style.display = "block";
+          }
+        }
+
+        if (!dueDetails || !dueDetails.amount) {
+          showStatus("Due not found. Please go back and try again.", "error");
+          return;
+        }
+
+        // Fill in details
+        $("amount").textContent = money(dueDetails.amount) + " BDT";
+        $("feeStatus").textContent = (dueDetails.status || "unpaid").toUpperCase();
+        
+        // Set today's date as default transaction date
+        const today = new Date().toISOString().split("T")[0];
+        $("txnDate").value = today;
+
+        // Store due info globally for submission
+        window.dueInfo = { type: dueType, id: dueId, ...dueDetails };
+
+      } catch (e) {
+        showStatus(e.message || "Failed to load payment details.", "error");
+      }
+    }
+
+    // ===== HANDLE PAYMENT SUBMISSION =====
+    $("paymentForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      if (!window.dueInfo) {
+        showStatus("Payment details not loaded. Please refresh.", "error");
+        return;
+      }
+
+      try {
+        $("payBtn").disabled = true;
+        showStatus("Processing payment...", "info");
+
+        const txnRef = $("txnRef").value.trim();
+        const txnDate = $("txnDate").value;
+        const method = document.querySelector('input[name="paymentMethod"]:checked').value;
+
+        if (!txnRef || !txnDate) {
+          showStatus("Please fill in all fields.", "error");
+          $("payBtn").disabled = false;
+          return;
+        }
+
+        const dueType = window.dueInfo.type;
+        const dueId = window.dueInfo.id;
+
+        let endpoint = "";
+        let payload = {
+          txn_ref: txnRef,
+          txn_date: txnDate,
+          payment_method: method
+        };
+
+        // Call appropriate payment endpoint
+        if (dueType === "hall") {
+          endpoint = `/api/hall/dues/${dueId}/pay`;
+          payload = { method: "POST", ...payload };
+        } else if (dueType === "department") {
+          endpoint = `/api/dept/dues/${dueId}/pay`;
+          payload = { method: "POST", ...payload };
+        }
+
+        const res = await api(endpoint, {
+          method: "POST",
+          body: JSON.stringify(payload)
+        });
+
+        showStatus(res.message || "Payment successful!", "success");
+        $("payBtn").textContent = "✓ Payment Complete";
+
+        // Redirect back to dashboard after 2 seconds
+        setTimeout(() => {
+          window.location.href = "student.html";
+        }, 2000);
+
+      } catch (e) {
+        showStatus(e.message || "Payment failed.", "error");
+        $("payBtn").disabled = false;
+      }
+    });
+
+    // ===== CANCEL BUTTON =====
+    $("cancelBtn").addEventListener("click", () => {
+      window.history.back();
+    });
+
+    // Load payment details on page load
+    loadPaymentDetails();
+  </script>
+</body>
+</html>

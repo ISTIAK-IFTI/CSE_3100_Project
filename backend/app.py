@@ -314,53 +314,6 @@ def student_department_dues():
     ]
     
     return jsonify({"items": items}), 200
-def student_hall_fees():
-    """Get monthly hall fees for currently logged-in student with hall and account info"""
-    student_id = request.args.get("id") or request.headers.get("X-Student-Id")
-    
-    if not student_id:
-        return jsonify({"message": "Student ID not provided"}), 400
-    
-    con = get_db()
-    cur = con.cursor()
-    
-    # Fetch monthly fees from hall_dues with hall and account info
-    cur.execute("""
-        SELECT 
-            hd.id,
-            hd.month,
-            hd.amount,
-            hd.status,
-            hd.paid_date,
-            h.hall_name,
-            pa.account_name
-        FROM hall_dues hd
-        LEFT JOIN halls h ON hd.hall_id = h.id
-        LEFT JOIN payment_accounts pa ON pa.account_type = 'hall' AND pa.entity_identifier = h.hall_name AND pa.is_active = 1
-        WHERE hd.student_id = ?
-        ORDER BY hd.month DESC
-    """, (student_id,))
-    
-    rows = cur.fetchall()
-    con.close()
-    
-    if not rows:
-        return jsonify({"items": []}), 200
-    
-    items = [
-        {
-            "id": row["id"],
-            "month": row["month"],
-            "amount": int(row["amount"] or 0),
-            "status": row["status"],
-            "paid_date": row["paid_date"],
-            "hall_name": row["hall_name"],
-            "account_name": row["account_name"]
-        }
-        for row in rows
-    ]
-    
-    return jsonify({"items": items}), 200
 
 
 # -------------------------
@@ -1399,6 +1352,8 @@ def get_hall_dues():
 # -------------------------
 @app.route("/api/hall/dues/<due_id>/pay", methods=["POST"])
 def mark_due_paid(due_id):
+    data = request.json or {}
+    
     con = get_db()
     cur = con.cursor()
     
@@ -1428,7 +1383,7 @@ def mark_due_paid(due_id):
         con.commit()
         con.close()
         
-        return jsonify({"message": "Due marked as paid"}), 200
+        return jsonify({"message": "Hall due marked as paid successfully"}), 200
     
     except Exception as e:
         con.close()
@@ -1860,6 +1815,57 @@ def search_hall_dues():
         "total": len(dues),
         "dues": dues
     }), 200
+
+
+# =========================================
+#     DEPARTMENT DUES PAYMENT
+# =========================================
+
+# -------------------------
+# DEPT: Mark Due as Paid
+# -------------------------
+@app.route("/api/dept/dues/<fee_id>/pay", methods=["POST"])
+def mark_dept_due_paid(fee_id):
+    data = request.json or {}
+    
+    con = get_db()
+    cur = con.cursor()
+    
+    try:
+        # Get the department due
+        cur.execute("""
+            SELECT student_id, amount, dept_id FROM department_dues WHERE fee_id=?
+        """, (fee_id,))
+        due_row = cur.fetchone()
+        
+        if not due_row:
+            con.close()
+            return jsonify({"message": "Due not found"}), 404
+        
+        student_id = due_row["student_id"]
+        amount = int(due_row["amount"] or 0)
+        
+        # Mark as paid
+        paid_date = now_iso()
+        cur.execute("""
+            UPDATE department_dues SET status='paid', paid_date=? WHERE fee_id=?
+        """, (paid_date, fee_id))
+        
+        # Update student's dept_fee (subtract from total)
+        cur.execute("SELECT dept_fee FROM students WHERE id=?", (student_id,))
+        student = cur.fetchone()
+        current_fee = int(student["dept_fee"] or 0)
+        new_fee = max(0, current_fee - amount)
+        cur.execute("UPDATE students SET dept_fee=? WHERE id=?", (new_fee, student_id))
+        
+        con.commit()
+        con.close()
+        
+        return jsonify({"message": "Department due marked as paid successfully"}), 200
+    
+    except Exception as e:
+        con.close()
+        return jsonify({"message": str(e)}), 500
 
 
 #  ------------------------------------------

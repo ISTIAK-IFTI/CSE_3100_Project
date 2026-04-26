@@ -55,9 +55,6 @@ def dml():
 
 
 def get_table_columns(table_name):
-
-    print("\n", "Table Name : ", table_name, "\n")
-
     import sqlite3
     from pathlib import Path
 
@@ -67,15 +64,13 @@ def get_table_columns(table_name):
     con.row_factory = sqlite3.Row
     cur = con.cursor()
     try:
-        # টেবিল খালি থাকলেও এটি কলামের লিস্ট দিবে
         cur.execute(f"PRAGMA table_info({table_name})")
         
         columns = cur.fetchall()
         
-        print(f"--- Columns in '{table_name}' ---")
+        print(f"\n--- Columns in '{table_name}' ---\n")
         column_names = []
         for col in columns:
-            # col[0] = Field Name, col[1] = Type, col[2] = Null, col[3] = Key
             print(f"Field: {col[0]} | Type: {col[1]} | Null: {col[2]}")
             column_names.append(col[0])
             
@@ -141,7 +136,22 @@ def show_table_info(table_name):
 
     print("✅ Database file:", db_path)
 
+def show_all_table_name():
+    import sqlite3
+    from pathlib import Path
+
+    db_path = Path(__file__).parent / "ruet.db"
+
+    con = sqlite3.connect(db_path)
+    con.row_factory = sqlite3.Row
+    cur = con.cursor()
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    tables = cur.fetchall()
+    for t in tables:
+        print(t[0])
+    con.close()
 
 # dml()
-show_table_info('department_dues')
+# show_table_info('department_dues')
 # get_table_columns('department_dues')
+show_all_table_name()

@@ -304,25 +304,13 @@
             <th>Item</th>
             <th>Amount</th>
             <th>Account</th>
+            <th>Action</th>
           </tr>
         </thead>
         <tbody id="dueBody">
           <!-- rows inserted by JS -->
         </tbody>
       </table>
-
-      <div class="sectionTitle" style="margin-top:16px;">Pay Due Now</div>
-      <form id="payForm" class="payBox">
-        <div class="field">
-          <label for="account">Account</label>
-          <input id="account" placeholder="e.g., bkash/rocket/bank account" required />
-        </div>
-        <div class="field">
-          <label for="amount">Amount</label>
-          <input id="amount" type="number" min="1" step="1" placeholder="e.g., 500" required />
-        </div>
-        <button class="btn" type="submit" id="payBtn">Pay</button>
-      </form>
 
       <div id="message" class="msg"></div>
       <div class="footerHint">
@@ -365,8 +353,7 @@
   const refreshBtn = document.getElementById("refreshBtn");
   const logoutBtn = document.getElementById("logoutBtn");
 
-  const payForm = document.getElementById("payForm");
-  const payBtn = document.getElementById("payBtn");
+
 
   function showMsg(text, type = "ok") {
     msg.textContent = text;
@@ -396,7 +383,7 @@
     let items = data?.due?.items ?? [];
     items = items.filter(item => item.title !== "Hall Fee" && item.title !== "Department Fee");
     
-    // Add account info to old dues
+    // Add account info and metadata to old dues
     items = items.map(item => {
       let account = "—";
       if (item.title === "Library Fine" && libraryAccount) {
@@ -404,43 +391,65 @@
       }
       return {
         ...item,
-        account: account
+        account: account,
+        status: "unpaid"
       };
     });
     
-    // Department dues
+    // Department dues with fee_id
     const departmentFeesItems = (departmentDues || []).map(d => ({
-      title: `Dept Fee: ${d.fee_type} ${d.fee_id}`,
+      title: `Dept Fee: ${d.fee_type}`,
       amount: d.amount,
-      account: d.account_name || "—"
+      account: d.account_name || "—",
+      fee_id: d.fee_id,
+      status: d.status || "unpaid"
     }));
     
-    // Monthly fees with hall account names
+    // Monthly fees with hall account names and id
     const monthlyFeesItems = (monthlyFees || []).map(f => ({
       title: `Hall Fee (${f.month})`,
       amount: f.amount,
-      account: f.account_name || "—"
+      account: f.account_name || "—",
+      id: f.id,
+      status: f.status || "unpaid"
     }));
     
     const allItems = [...items, ...departmentFeesItems, ...monthlyFeesItems];
 
-    // Calculate total due (including monthly fees)
-    const total = allItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+    // Calculate total due (including monthly fees, only unpaid)
+    const total = allItems
+      .filter(item => (item.status || "").toLowerCase() !== "paid")
+      .reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
     elTotalDue.textContent = money(total);
+
+    // Filter to show only unpaid items with amount > 0 in the table
+    const unpaidItems = allItems.filter(item => 
+      (item.status || "").toLowerCase() !== "paid" && (Number(item.amount) || 0) > 0
+    );
 
     dueBody.innerHTML = "";
 
-    if (!allItems.length) {
+    if (!unpaidItems.length) {
       const tr = document.createElement("tr");
-      tr.innerHTML = `<td colspan="3" style="color:#6b7280;">No dues found.</td>`;
+      tr.innerHTML = `<td colspan="4" style="color:#6b7280;">No dues found.</td>`;
       dueBody.appendChild(tr);
     } else {
-      for (const it of allItems) {
+      for (const it of unpaidItems) {
         const tr = document.createElement("tr");
+        
+        // Generate pay button only for unpaid dues
+        let payAction = "—";
+        if ((it.status || "").toLowerCase() !== "paid") {
+          const dueId = it.id || it.fee_id;
+          const dueType = it.id ? "hall" : "department";
+          payAction = `<a href="payment.html?type=${dueType}&id=${dueId}" style="padding:8px 12px;font-size:12px;text-decoration:none;display:inline-block;border:1px solid var(--line);border-radius:8px;cursor:pointer;background:#fff;color:var(--text)">Pay</a>`;
+        }
+        
         tr.innerHTML = `
           <td>${it.title ?? "-"}</td>
           <td>${money(it.amount ?? 0)}</td>
           <td>${it.account ?? "-"}</td>
+          <td>${payAction}</td>
         `;
         dueBody.appendChild(tr);
       }
@@ -530,23 +539,7 @@
     }
   }
 
-  // =========================
-  // 5) PAY DUE (still mock)
-  // =========================
-  payForm.addEventListener("submit", (e) => {
-    e.preventDefault();
 
-    const account = document.getElementById("account").value.trim();
-    const amount = Number(document.getElementById("amount").value);
-
-    if (!account || !amount || amount <= 0) {
-      showMsg("Please enter valid account and amount.", "err");
-      return;
-    }
-
-    showMsg("Payment simulated successfully ✅", "ok");
-    payForm.reset();
-  });
 
   // =========================
   // 6) BUTTONS

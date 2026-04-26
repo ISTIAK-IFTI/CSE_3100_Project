@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Pay Buttons</title>
+</head>
+<body>
+    <h1>Testing Pay Button Generation</h1>
+    <div id="result"></div>
+
+    <script>
+        // Simulate API responses
+        const mockDuesResponse = {
+            items: [
+                { feeType: "Registration Fee", period: "Semester 1", amount: 5000, status: "unpaid" },
+                { feeType: "Course Fee", period: "Current", amount: 3000, status: "paid" }
+            ]
+        };
+
+        const mockHallFeesResponse = {
+            items: [
+                { id: 101, month: "2026-04", amount: 2500, status: "unpaid", hall_name: "Test Hall", account_name: "Hall Account" },
+                { id: 102, month: "2026-03", amount: 2500, status: "paid", hall_name: "Test Hall", account_name: "Hall Account" }
+            ]
+        };
+
+        const mockDeptDuesResponse = {
+            items: [
+                { fee_id: "FEE-001", fee_type: "Lab Fee", amount: 1500, status: "unpaid", deadline: "2026-05-15", dept_name: "CSE", account_name: "Dept Account" },
+                { fee_id: "FEE-002", fee_type: "Practical Fee", amount: 1000, status: "paid", deadline: "2026-05-10", dept_name: "CSE", account_name: "Dept Account" }
+            ]
+        };
+
+        function generateTable() {
+            // Combine all dues (same logic as student.html)
+            const allDues = mockDuesResponse.items || [];
+            
+            const hallFees = (mockHallFeesResponse.items || []).map(f => ({
+                id: f.id,
+                feeType: `Hall Fee (${f.month})`,
+                period: f.month,
+                amount: f.amount,
+                status: f.status
+            }));
+            
+            const deptDuesFormatted = (mockDeptDuesResponse.items || []).map(d => ({
+                fee_id: d.fee_id,
+                feeType: d.fee_type || "Department Fee",
+                period: d.deadline || "—",
+                amount: d.amount,
+                status: d.status
+            }));
+            
+            const combinedDues = [...allDues, ...hallFees, ...deptDuesFormatted];
+            
+            let html = `
+            <table border="1" cellpadding="10" cellspacing="0">
+                <thead>
+                    <tr>
+                        <th>Fee Type</th>
+                        <th>Month/Semester</th>
+                        <th>Amount (BDT)</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+            `;
+            
+            combinedDues.forEach(x => {
+                const isUnpaid = (x.status || "").toLowerCase() !== "paid";
+                const dueId = x.id || x.fee_id;
+                const dueType = x.id ? "hall" : "department";
+                const payAction = isUnpaid 
+                    ? `<a href="payment.html?type=${dueType}&id=${dueId}" style="padding:8px 12px;font-size:12px;text-decoration:none;display:inline-block;border:1px solid #ccc;border-radius:8px;cursor:pointer;background:#fff;color:#111">Pay</a>`
+                    : `—`;
+                
+                html += `
+                    <tr>
+                        <td>${x.feeType || "-"}</td>
+                        <td>${x.period || "-"}</td>
+                        <td>${x.amount}</td>
+                        <td>${x.status.toUpperCase()}</td>
+                        <td>${payAction}</td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                </tbody>
+            </table>
+            `;
+            
+            return html;
+        }
+
+        const result = generateTable();
+        document.getElementById("result").innerHTML = result;
+        
+        // Also log the combined dues to verify
+        const allDues = mockDuesResponse.items || [];
+        const hallFees = (mockHallFeesResponse.items || []).map(f => ({
+            id: f.id,
+            feeType: `Hall Fee (${f.month})`,
+            period: f.month,
+            amount: f.amount,
+            status: f.status
+        }));
+        const deptDuesFormatted = (mockDeptDuesResponse.items || []).map(d => ({
+            fee_id: d.fee_id,
+            feeType: d.fee_type || "Department Fee",
+            period: d.deadline || "—",
+            amount: d.amount,
+            status: d.status
+        }));
+        const combinedDues = [...allDues, ...hallFees, ...deptDuesFormatted];
+        
+        console.log("Combined Dues:", combinedDues);
+        console.log("\n✅ Expected Pay Buttons:");
+        combinedDues.forEach((due, idx) => {
+            if ((due.status || "").toLowerCase() !== "paid") {
+                const dueId = due.id || due.fee_id;
+                const dueType = due.id ? "hall" : "department";
+                console.log(`${idx + 1}. ${due.feeType} - payment.html?type=${dueType}&id=${dueId}`);
+            }
+        });
+    </script>
+</body>
+</html>
