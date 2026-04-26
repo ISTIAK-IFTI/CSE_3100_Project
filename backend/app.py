@@ -317,6 +317,56 @@ def student_department_dues():
 
 
 # -------------------------
+# STUDENT: Get Library Fines
+# -------------------------
+@app.route("/api/student/library-fines")
+def student_library_fines():
+    """Get library fines for a student"""
+    student_id = request.args.get("id")
+    
+    if not student_id:
+        return jsonify({"message": "Student ID not provided"}), 400
+    
+    con = get_db()
+    cur = con.cursor()
+    
+    cur.execute("""
+        SELECT 
+            id,
+            student_id,
+            fine_description,
+            amount,
+            fine_date,
+            status,
+            created_at
+        FROM library_fines
+        WHERE student_id = ?
+        ORDER BY created_at DESC
+    """, (student_id,))
+    
+    rows = cur.fetchall()
+    con.close()
+    
+    if not rows:
+        return jsonify({"items": []}), 200
+    
+    items = [
+        {
+            "id": row["id"],
+            "student_id": row["student_id"],
+            "description": row["fine_description"],
+            "amount": int(row["amount"] or 0),
+            "fine_date": row["fine_date"],
+            "status": row["status"],
+            "created_at": row["created_at"]
+        }
+        for row in rows
+    ]
+    
+    return jsonify({"items": items}), 200
+
+
+# -------------------------
 # STUDENT: Get Payment History
 # -------------------------
 @app.route("/api/student/payments")
@@ -1862,6 +1912,54 @@ def mark_dept_due_paid(fee_id):
         con.close()
         
         return jsonify({"message": "Department due marked as paid successfully"}), 200
+    
+    except Exception as e:
+        con.close()
+        return jsonify({"message": str(e)}), 500
+
+
+# -------------------------
+# LIBRARY: Pay Library Fine
+# -------------------------
+@app.route("/api/library/fines/<fine_id>/pay", methods=["POST"])
+def mark_library_fine_paid(fine_id):
+    """Mark a library fine as paid and update student's library_fee"""
+    data = request.json or {}
+    
+    con = get_db()
+    cur = con.cursor()
+    
+    try:
+        # Get the library fine
+        cur.execute("""
+            SELECT student_id, amount FROM library_fines WHERE id=?
+        """, (fine_id,))
+        fine_row = cur.fetchone()
+        
+        if not fine_row:
+            con.close()
+            return jsonify({"message": "Library fine not found"}), 404
+        
+        student_id = fine_row["student_id"]
+        amount = int(fine_row["amount"] or 0)
+        
+        # Mark as paid
+        paid_date = now_iso()
+        cur.execute("""
+            UPDATE library_fines SET status='paid', paid_date=? WHERE id=?
+        """, (paid_date, fine_id))
+        
+        # Update student's library_fee (subtract from total)
+        cur.execute("SELECT library_fee FROM students WHERE id=?", (student_id,))
+        student = cur.fetchone()
+        current_fee = int(student["library_fee"] or 0)
+        new_fee = max(0, current_fee - amount)
+        cur.execute("UPDATE students SET library_fee=? WHERE id=?", (new_fee, student_id))
+        
+        con.commit()
+        con.close()
+        
+        return jsonify({"message": "Library fine marked as paid successfully"}), 200
     
     except Exception as e:
         con.close()

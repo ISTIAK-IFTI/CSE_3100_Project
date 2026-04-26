@@ -368,7 +368,7 @@
   // =========================
   // 3) RENDER FUNCTION
   // =========================
-  function renderStudent(data, monthlyFees = [], libraryAccount = null, departmentDues = []) {
+  function renderStudent(data, monthlyFees = [], libraryAccount = null, departmentDues = [], libraryFines = []) {
     elName.textContent = data?.name ?? "—";
     elStudentId.textContent = data?.studentId ?? "—";
     elDept.textContent = data?.dept ?? "—";
@@ -379,9 +379,9 @@
     // elPhoto.src = "https://via.placeholder.com/300?text=Student+Photo";
     elPhoto.src = `media/students/${data.studentId}.jpg`;
 
-    // Old dues (filter out "Hall Fee" since we now show monthly fees separately)
+    // Old dues (filter out "Hall Fee" and "Department Fee" since we show them separately, also filter out "Library Fine" since it doesn't have individual IDs)
     let items = data?.due?.items ?? [];
-    items = items.filter(item => item.title !== "Hall Fee" && item.title !== "Department Fee");
+    items = items.filter(item => item.title !== "Hall Fee" && item.title !== "Department Fee" && item.title !== "Library Fine");
     
     // Add account info and metadata to old dues
     items = items.map(item => {
@@ -414,7 +414,16 @@
       status: f.status || "unpaid"
     }));
     
-    const allItems = [...items, ...departmentFeesItems, ...monthlyFeesItems];
+    // Library fines with id
+    const libraryFinesItems = (libraryFines || []).map(lf => ({
+      title: `Library Fine`,
+      amount: lf.amount,
+      account: libraryAccount?.account_name || "—",
+      library_fine_id: lf.id,
+      status: lf.status || "unpaid"
+    }));
+    
+    const allItems = [...items, ...departmentFeesItems, ...monthlyFeesItems, ...libraryFinesItems];
 
     // Calculate total due (including monthly fees, only unpaid)
     const total = allItems
@@ -440,9 +449,20 @@
         // Generate pay button only for unpaid dues
         let payAction = "—";
         if ((it.status || "").toLowerCase() !== "paid") {
-          const dueId = it.id || it.fee_id;
-          const dueType = it.id ? "hall" : "department";
-          payAction = `<a href="payment.html?type=${dueType}&id=${dueId}" style="padding:8px 12px;font-size:12px;text-decoration:none;display:inline-block;border:1px solid var(--line);border-radius:8px;cursor:pointer;background:#fff;color:var(--text)">Pay</a>`;
+          let dueId, dueType;
+          if (it.id) {
+            dueId = it.id;
+            dueType = "hall";
+          } else if (it.fee_id) {
+            dueId = it.fee_id;
+            dueType = "department";
+          } else if (it.library_fine_id) {
+            dueId = it.library_fine_id;
+            dueType = "library";
+          }
+          if (dueId && dueType) {
+            payAction = `<a href="payment.html?type=${dueType}&id=${dueId}" style="padding:8px 12px;font-size:12px;text-decoration:none;display:inline-block;border:1px solid var(--line);border-radius:8px;cursor:pointer;background:#fff;color:var(--text)">Pay</a>`;
+          }
         }
         
         tr.innerHTML = `
@@ -530,7 +550,23 @@
         console.warn("Error fetching department dues:", err.message);
       }
 
-      renderStudent(data, monthlyFees, libraryAccount, departmentDues);
+      // Fetch library fines
+      let libraryFines = [];
+      try {
+        console.log("Fetching library fines from:", `${API_BASE}/api/student/library-fines?id=${studentId}`);
+        const libFinesRes = await fetch(`${API_BASE}/api/student/library-fines?id=${studentId}`);
+        if (libFinesRes.ok) {
+          const libFinesData = await libFinesRes.json();
+          libraryFines = libFinesData.items || [];
+          console.log("Library fines:", libraryFines);
+        } else {
+          console.warn("Could not fetch library fines:", libFinesRes.status);
+        }
+      } catch (err) {
+        console.warn("Error fetching library fines:", err.message);
+      }
+
+      renderStudent(data, monthlyFees, libraryAccount, departmentDues, libraryFines);
       showMsg("Loaded from database ✅", "ok");
 
     } catch (err) {

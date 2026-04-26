@@ -247,6 +247,16 @@
             $("accountName").textContent = dueDetails.account_name || "RUET Department Account";
             $("accountSection").style.display = "block";
           }
+        } else if (dueType === "library") {
+          const dues = await api(`/api/student/library-fines?id=${studentId}`);
+          dueDetails = dues.items?.find(d => d.id == dueId);
+          if (dueDetails) {
+            $("feeType").textContent = `Library Fine`;
+            $("feeDesc").textContent = dueDetails.description || "Library Fine";
+            $("dueDate").textContent = dueDetails.fine_date || "—";
+            $("accountName").textContent = "Library Account";
+            $("accountSection").style.display = "block";
+          }
         }
 
         if (!dueDetails || !dueDetails.amount) {
@@ -310,6 +320,9 @@
         } else if (dueType === "department") {
           endpoint = `/api/dept/dues/${dueId}/pay`;
           payload = { method: "POST", ...payload };
+        } else if (dueType === "library") {
+          endpoint = `/api/library/fines/${dueId}/pay`;
+          payload = { method: "POST", ...payload };
         }
 
         const res = await api(endpoint, {
@@ -322,7 +335,7 @@
 
         // Redirect back to dashboard after 2 seconds
         setTimeout(() => {
-          window.location.href = "student.html";
+          window.location.href = "student1.html";
         }, 2000);
 
       } catch (e) {
