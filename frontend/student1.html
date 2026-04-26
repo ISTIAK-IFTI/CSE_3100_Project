@@ -35,7 +35,8 @@
 
     .header{
       display:flex;
-      align-items:flex-end;
+      flex-wrap: wrap;
+      align-items:center;
       justify-content:space-between;
       gap:12px;
       margin-bottom: 14px;
@@ -45,11 +46,15 @@
       font-size: 24px;
       border-bottom: 2px solid var(--line);
       padding-bottom: 8px;
+      flex: 1 1 auto;
+      min-width: 200px;
     }
     .header .actions{
       display:flex;
-      gap:10px;
+      flex-wrap: wrap;
+      gap:8px;
       align-items:center;
+      justify-content: flex-end;
     }
     .btn{
       border:none;
@@ -237,22 +242,37 @@
     }
 
     @media (max-width: 760px){
+      .page { padding: 0 14px 40px; }
       .top{ grid-template-columns: 1fr; }
       .payBox{ grid-template-columns: 1fr; }
-      .header{ align-items:flex-start; flex-direction: column; }
-      .header h1 { font-size: 20px; }
-      .header .actions { width: 100%; gap: 8px; }
-      .btn { min-height: 44px; font-size: 15px; padding: 12px; }
+      .header { flex-direction: row; align-items: center; justify-content: space-between; }
+      .header h1 { font-size: 18px; flex: 1 1 auto; }
+      .header .actions { width: auto; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+      .btn { min-height: 40px; font-size: 13px; padding: 8px 12px; white-space: nowrap; }
       input { font-size: 16px; }
     }
-    @media (max-width: 520px){
-      .page { padding: 0 12px 30px; margin: 16px auto; }
-      .card { padding: 12px; }
-      .header .actions { flex-direction: column; }
-      .btn { width: 100%; }
+    @media (max-width: 640px){
+      .page { padding: 0 12px 30px; margin: 12px auto; }
+      .card { padding: 14px; }
+      .header { gap: 8px; margin-bottom: 12px; }
+      .header h1 { font-size: 16px; padding-bottom: 6px; }
+      .header .actions { gap: 6px; }
+      .btn { min-height: 38px; font-size: 12px; padding: 6px 10px; flex: 0 1 auto; }
       .pill { min-width: auto; width: 100%; }
-      table { font-size: 12px; }
-      th, td { padding: 8px; }
+      table { font-size: 11px; }
+      th, td { padding: 6px; }
+    }
+    @media (max-width: 480px){
+      .page { padding: 0 10px 20px; margin: 10px auto; }
+      .card { padding: 12px; }
+      .header { flex-direction: column; align-items: stretch; gap: 10px; margin-bottom: 10px; }
+      .header h1 { font-size: 14px; border-bottom: 1px solid var(--line); padding-bottom: 6px; margin: 0; }
+      .header .actions { width: 100%; justify-content: space-between; gap: 4px; }
+      .btn { min-height: 36px; font-size: 11px; padding: 6px 8px; flex: 1 1 auto; }
+      .pill { font-size: 12px; padding: 8px; }
+      .sectionTitle { font-size: 13px; margin: 8px 0; }
+      table { font-size: 10px; width: 100%; overflow-x: auto; }
+      th, td { padding: 4px; }
     }
   </style>
 </head>

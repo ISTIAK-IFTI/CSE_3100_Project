@@ -12,7 +12,7 @@ def dml():
     password = "676"
     password_bytes = password.encode("utf-8")
     hashed = bcrypt.hashpw(password_bytes, bcrypt.gensalt()).decode("utf-8")
-
+    cur.execute("update students set verified = 1 where id='2201074'")
     # if True:
     #     studentId = 2203177
     #     cur.execute(f"deleted from students where id = {studentId}")
@@ -34,11 +34,11 @@ def dml():
     #         PRIMARY KEY(dept_id, student_id, fee_id)
     #     )
     # """)
-    try:
-        cur.execute("alter table department_dues add column deadline date")
-        print("✅ Done")
-    except:
-        print("❌ Not working")
+    # try:
+    #     cur.execute("alter table department_dues add column deadline date")
+    #     print("✅ Done")
+    # except:
+    #     print("❌ Not working")
 
     # cur.execute("""
     # insert into halls (email, hall_name, password_hash)
@@ -151,7 +151,7 @@ def show_all_table_name():
         print(t[0])
     con.close()
 
-# dml()
-# show_table_info('department_dues')
+dml()
+# show_table_info('students')
 # get_table_columns('department_dues')
-show_all_table_name()
+# show_all_table_name()
