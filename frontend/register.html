@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" type="image/png" href="/frontend/media/icons/ruet_logo.png">
   <title>Student Registration</title>
 
   <style>
@@ -310,7 +311,10 @@
       let data = {};
       try { data = JSON.parse(raw); } catch {}
 
-      if (!res.ok) {
+      // Check if registration succeeded (look for OTP sent in response)
+      const isSuccess = res.ok || (data.message && data.message.toLowerCase().includes("otp"));
+      
+      if (!isSuccess) {
         show(data.message || `Registration failed (HTTP ${res.status})`, false);
         return; // ✅ no redirect if server says fail
       }
